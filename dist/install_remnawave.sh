@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Remnawave Installer (модульная версия)
-# Собрано: Tue Mar 11 08:12:18 UTC 2025
+# Собрано: Tue Mar 11 09:04:27 UTC 2025
 
 # Включение модуля: common.sh
 
