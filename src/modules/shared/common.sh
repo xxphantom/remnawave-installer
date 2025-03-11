@@ -64,36 +64,26 @@ draw_info_box() {
 
 generate_secure_password() {
     local length="${1:-16}"
-    # Пул символов: буквы, цифры и только перечисленные спецсимволы
-    local chars='a-zA-Z0-9!%^&*_+.,'
     local password=""
-
-    # Проверяем, есть ли openssl
-    if command -v openssl &>/dev/null; then
-        password="$(openssl rand -base64 48 \
-            | tr -dc "$chars" \
-            | head -c "$length")"
-    else
-        # Если openssl недоступен, fallback на /dev/urandom
-        password="$(head -c 100 /dev/urandom \
-            | tr -dc "$chars" \
-            | head -c "$length")"
-    fi
-
-    # Проверка наличия символов каждого типа
     local special_chars='!%^&*_+.,'
     local uppercase_chars='ABCDEFGHIJKLMNOPQRSTUVWXYZ'
     local lowercase_chars='abcdefghijklmnopqrstuvwxyz'
     local number_chars='0123456789'
+    local alphanumeric_chars="${uppercase_chars}${lowercase_chars}${number_chars}"
     
-    # Если нет специального символа, добавляем его
-    if ! [[ "$password" =~ [$special_chars] ]]; then
-        local position=$((RANDOM % length))
-        local one_special="$(echo "$special_chars" | fold -w1 | shuf | head -n1)"
-        # Заменяем символ в случайной позиции
-        password="${password:0:$position}${one_special}${password:$((position+1))}"
+    # Генерируем начальный пароль только из букв и цифр
+    if command -v openssl &>/dev/null; then
+        password="$(openssl rand -base64 48 \
+            | tr -dc "$alphanumeric_chars" \
+            | head -c "$length")"
+    else
+        # Если openssl недоступен, fallback на /dev/urandom
+        password="$(head -c 100 /dev/urandom \
+            | tr -dc "$alphanumeric_chars" \
+            | head -c "$length")"
     fi
     
+    # Проверяем наличие символов каждого типа и добавляем недостающие
     # Если нет символа верхнего регистра, добавляем его
     if ! [[ "$password" =~ [$uppercase_chars] ]]; then
         local position=$((RANDOM % length))
@@ -114,6 +104,19 @@ generate_secure_password() {
         local one_number="$(echo "$number_chars" | fold -w1 | shuf | head -n1)"
         password="${password:0:$position}${one_number}${password:$((position+1))}"
     fi
+    
+    # Добавляем от 1 до 3 специальных символов (в зависимости от длины пароля)
+    # но не более 25% длины пароля
+    local special_count=$((length / 4))
+    special_count=$((special_count > 0 ? special_count : 1))
+    special_count=$((special_count < 3 ? special_count : 3))
+    
+    for ((i=0; i<special_count; i++)); do
+        # Выбираем случайную позицию, избегая первого и последнего символа
+        local position=$((RANDOM % (length - 2) + 1))
+        local one_special="$(echo "$special_chars" | fold -w1 | shuf | head -n1)"
+        password="${password:0:$position}${one_special}${password:$((position+1))}"
+    done
 
     echo "$password"
 }
