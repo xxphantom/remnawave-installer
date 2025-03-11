@@ -204,7 +204,11 @@ install_panel() {
     # Установка и настройка Caddy для панели и подписок
     # ===================================================================================
 
-    setup_caddy_for_panel
+    # Генерация секретного ключа для защиты панели управления
+    PANEL_SECRET_KEY=$(openssl rand -hex 16)
+    
+    # Передаем секретный ключ в функцию настройки Caddy
+    setup_caddy_for_panel "$PANEL_SECRET_KEY"
 
     # Запуск всех контейнеров
     echo -e "${BOLD_GREEN}Запуск контейнеров...${NC}"
@@ -266,5 +270,5 @@ install_panel() {
         echo -e "${GRAY}Ответ сервера: $reg_token${NC}"
     fi
 
-    display_panel_installation_complete_message
+    display_panel_installation_complete_message "$PANEL_SECRET_KEY"
 }
