@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Remnawave Installer (модульная версия)
-# Собрано: Tue Mar 11 11:55:24 UTC 2025
+# Собрано: Tue Mar 11 18:36:09 UTC 2025
 
 # Включение модуля: common.sh
 
@@ -69,36 +69,26 @@ draw_info_box() {
 
 generate_secure_password() {
     local length="${1:-16}"
-    # Пул символов: буквы, цифры и только перечисленные спецсимволы
-    local chars='a-zA-Z0-9!%^&*_+.,'
     local password=""
-
-    # Проверяем, есть ли openssl
-    if command -v openssl &>/dev/null; then
-        password="$(openssl rand -base64 48 \
-            | tr -dc "$chars" \
-            | head -c "$length")"
-    else
-        # Если openssl недоступен, fallback на /dev/urandom
-        password="$(head -c 100 /dev/urandom \
-            | tr -dc "$chars" \
-            | head -c "$length")"
-    fi
-
-    # Проверка наличия символов каждого типа
     local special_chars='!%^&*_+.,'
     local uppercase_chars='ABCDEFGHIJKLMNOPQRSTUVWXYZ'
     local lowercase_chars='abcdefghijklmnopqrstuvwxyz'
     local number_chars='0123456789'
+    local alphanumeric_chars="${uppercase_chars}${lowercase_chars}${number_chars}"
     
-    # Если нет специального символа, добавляем его
-    if ! [[ "$password" =~ [$special_chars] ]]; then
-        local position=$((RANDOM % length))
-        local one_special="$(echo "$special_chars" | fold -w1 | shuf | head -n1)"
-        # Заменяем символ в случайной позиции
-        password="${password:0:$position}${one_special}${password:$((position+1))}"
+    # Генерируем начальный пароль только из букв и цифр
+    if command -v openssl &>/dev/null; then
+        password="$(openssl rand -base64 48 \
+            | tr -dc "$alphanumeric_chars" \
+            | head -c "$length")"
+    else
+        # Если openssl недоступен, fallback на /dev/urandom
+        password="$(head -c 100 /dev/urandom \
+            | tr -dc "$alphanumeric_chars" \
+            | head -c "$length")"
     fi
     
+    # Проверяем наличие символов каждого типа и добавляем недостающие
     # Если нет символа верхнего регистра, добавляем его
     if ! [[ "$password" =~ [$uppercase_chars] ]]; then
         local position=$((RANDOM % length))
@@ -119,6 +109,19 @@ generate_secure_password() {
         local one_number="$(echo "$number_chars" | fold -w1 | shuf | head -n1)"
         password="${password:0:$position}${one_number}${password:$((position+1))}"
     fi
+    
+    # Добавляем от 1 до 3 специальных символов (в зависимости от длины пароля)
+    # но не более 25% длины пароля
+    local special_count=$((length / 4))
+    special_count=$((special_count > 0 ? special_count : 1))
+    special_count=$((special_count < 3 ? special_count : 3))
+    
+    for ((i=0; i<special_count; i++)); do
+        # Выбираем случайную позицию, избегая первого и последнего символа
+        local position=$((RANDOM % (length - 2) + 1))
+        local one_special="$(echo "$special_chars" | fold -w1 | shuf | head -n1)"
+        password="${password:0:$position}${one_special}${password:$((position+1))}"
+    done
 
     echo "$password"
 }
@@ -1111,14 +1114,6 @@ install_panel() {
         NODES_NOTIFY_CHAT_ID="change-me"
     fi
 
-    # Запрос домена для поддержки с валидацией
-    SUB_SUPPORT_DOMAIN=$(read_domain "Введите домен для поддержки (для отображения в клиентском приложении) (например, support.example.com)")
-    echo
-
-    # Запрос домена для веб-страницы с валидацией
-    SUB_WEBPAGE_DOMAIN=$(read_domain "Введите домен для веб-страницы (для отображения в клиентском приложении) (например, webpage.example.com)")
-    echo
-
     # Запрашиваем основной домен для панели с валидацией
     SCRIPT_PANEL_DOMAIN=$(read_domain "Введите основной домен для вашей панели (например, panel.example.com)")
     echo
@@ -1190,8 +1185,6 @@ install_panel() {
     sed -i "s|TELEGRAM_BOT_TOKEN=change_me|TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN|" .env
     sed -i "s|TELEGRAM_ADMIN_ID=change_me|TELEGRAM_ADMIN_ID=$TELEGRAM_ADMIN_ID|" .env
     sed -i "s|NODES_NOTIFY_CHAT_ID=change_me|NODES_NOTIFY_CHAT_ID=$NODES_NOTIFY_CHAT_ID|" .env
-    sed -i "s|SUB_SUPPORT_URL=https://support.example.com|SUB_SUPPORT_URL=https://$SUB_SUPPORT_DOMAIN|" .env
-    sed -i "s|SUB_WEBPAGE_URL=https://example.com|SUB_WEBPAGE_URL=https://$SUB_WEBPAGE_DOMAIN|" .env
     sed -i "s|SUB_PUBLIC_DOMAIN=example.com|SUB_PUBLIC_DOMAIN=$SCRIPT_SUB_DOMAIN|" .env
     sed -i "s|DATABASE_URL=.*|DATABASE_URL=postgresql://$DB_USER:$DB_PASSWORD@remnawave-db:5432/$DB_NAME|" .env
     sed -i "s|POSTGRES_USER=.*|POSTGRES_USER=$DB_USER|" .env
@@ -1320,30 +1313,40 @@ EOF
     
     # Создаем Caddyfile
     cat > Caddyfile << 'EOF'
-{$SELF_STEAL_DOMAIN}:{$SELF_STEAL_PORT} {
-  @local {
-    remote_ip 127.0.0.1
-  }
+{
+    https_port {$SELF_STEAL_PORT}
+    default_bind 127.0.0.1
+    servers {
+        listener_wrappers {
+            proxy_protocol {
+                allow 127.0.0.1/32
+            }
+            tls
+        }
+    }
+    auto_https disable_redirects
+}
 
-  handle @local {
+http://{$SELF_STEAL_DOMAIN} {
+    bind 0.0.0.0
+    redir https://{$SELF_STEAL_DOMAIN}{uri} permanent
+}
+
+https://{$SELF_STEAL_DOMAIN} {
     root * /var/www/html
     try_files {path} /index.html
     file_server
-  }
-
-  handle {
-    respond 204
-  }
 }
 
+
 :{$SELF_STEAL_PORT} {
-  bind 0.0.0.0
-  respond 204
+    tls internal
+    respond 204
 }
 
 :80 {
-  bind 0.0.0.0
-  respond 204
+    bind 0.0.0.0
+    respond 204
 }
 EOF
     
