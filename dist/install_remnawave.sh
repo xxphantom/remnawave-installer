@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Remnawave Installer (модульная версия)
-# Собрано: Tue Mar 11 09:04:27 UTC 2025
+# Собрано: Tue Mar 11 11:55:24 UTC 2025
 
 # Включение модуля: common.sh
 
@@ -618,54 +618,69 @@ EOF
     # Создание Caddyfile с защитой панели
     cat >Caddyfile <<EOF
 {$PANEL_DOMAIN}:{$PANEL_PORT} {
-    @has_token_param {
-        query caddy={$PANEL_SECRET_KEY}
-    }
-    handle @has_token_param {
-        header +Set-Cookie "caddy={$PANEL_SECRET_KEY}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=31536000"
-    }
+        @has_token_param {
+                query caddy={$PANEL_SECRET_KEY}
+        }
+        handle @has_token_param {
+                header +Set-Cookie "caddy={$PANEL_SECRET_KEY}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=31536000"
+        }
 
-    @unauthorized {
-        not header Cookie *caddy={$PANEL_SECRET_KEY}*
-        not query caddy={$PANEL_SECRET_KEY}
-        path /
-    }
-    handle @unauthorized {
-      respond 200 {
-          body ""
-          close
-      }
-    }
+        @subscription_info_path {
+                path_regexp ^/api/sub/[^/]+
+        }
 
-    @unauthorized_non_root {
-        not header Cookie *caddy={$PANEL_SECRET_KEY}*
-        not query caddy={$PANEL_SECRET_KEY}
-        path_regexp .+
-    }
-    handle @unauthorized_non_root {
-        respond 404
-    }
+        handle @subscription_info_path {
+                reverse_proxy {$BACKEND_URL} {
+                        @notfound status 404
 
-    reverse_proxy {$BACKEND_URL} {
-        header_up X-Real-IP {remote}
-        header_up Host {host}
-    }
+                        handle_response @notfound {
+                                respond 404
+                        }
+
+                        header_up X-Real-IP {remote}
+                        header_up Host {host}
+                }
+        }
+        @unauthorized {
+                not header Cookie *caddy={$PANEL_SECRET_KEY}*
+                not query caddy={$PANEL_SECRET_KEY}
+                path /
+        }
+        handle @unauthorized {
+                respond 200 {
+                        body ""
+                        close
+                }
+        }
+
+        @unauthorized_non_root {
+                not header Cookie *caddy={$PANEL_SECRET_KEY}*
+                not query caddy={$PANEL_SECRET_KEY}
+                path_regexp .+
+        }
+        handle @unauthorized_non_root {
+                respond 404
+        }
+
+        reverse_proxy {$BACKEND_URL} {
+                header_up X-Real-IP {remote}
+                header_up Host {host}
+        }
 }
 
 {$SUB_DOMAIN}:{$SUB_PORT} {
-    handle {
-        $REWRITE_RULE
-        reverse_proxy {$SUB_BACKEND_URL} {
-            header_up X-Real-IP {remote}
-            header_up Host {host}
+        handle {
+                reverse_proxy {$SUB_BACKEND_URL} {
+                        header_up X-Real-IP {remote}
+                        header_up Host {host}
 
-            @error status 400 404 422 500
+                        @error status 400 404 422 500
 
-            handle_response @error {
-                error "" 404
-            }
+                        handle_response @error {
+                                error "" 404
+                        }
+                }
         }
-    }
 }
 EOF
 
@@ -822,7 +837,7 @@ vless_configuration() {
         "realitySettings": {
           "dest": "127.0.0.1:$SELF_STEAL_PORT",
           "show": false,
-          "xver": 0,
+          "xver": 1,
           "shortIds": [
             "$short_id"
           ],
