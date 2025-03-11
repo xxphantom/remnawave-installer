@@ -82,14 +82,6 @@ install_panel() {
         NODES_NOTIFY_CHAT_ID="change-me"
     fi
 
-    # Запрос домена для поддержки с валидацией
-    SUB_SUPPORT_DOMAIN=$(read_domain "Введите домен для поддержки (для отображения в клиентском приложении) (например, support.example.com)")
-    echo
-
-    # Запрос домена для веб-страницы с валидацией
-    SUB_WEBPAGE_DOMAIN=$(read_domain "Введите домен для веб-страницы (для отображения в клиентском приложении) (например, webpage.example.com)")
-    echo
-
     # Запрашиваем основной домен для панели с валидацией
     SCRIPT_PANEL_DOMAIN=$(read_domain "Введите основной домен для вашей панели (например, panel.example.com)")
     echo
@@ -161,8 +153,6 @@ install_panel() {
     sed -i "s|TELEGRAM_BOT_TOKEN=change_me|TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN|" .env
     sed -i "s|TELEGRAM_ADMIN_ID=change_me|TELEGRAM_ADMIN_ID=$TELEGRAM_ADMIN_ID|" .env
     sed -i "s|NODES_NOTIFY_CHAT_ID=change_me|NODES_NOTIFY_CHAT_ID=$NODES_NOTIFY_CHAT_ID|" .env
-    sed -i "s|SUB_SUPPORT_URL=https://support.example.com|SUB_SUPPORT_URL=https://$SUB_SUPPORT_DOMAIN|" .env
-    sed -i "s|SUB_WEBPAGE_URL=https://example.com|SUB_WEBPAGE_URL=https://$SUB_WEBPAGE_DOMAIN|" .env
     sed -i "s|SUB_PUBLIC_DOMAIN=example.com|SUB_PUBLIC_DOMAIN=$SCRIPT_SUB_DOMAIN|" .env
     sed -i "s|DATABASE_URL=.*|DATABASE_URL=postgresql://$DB_USER:$DB_PASSWORD@remnawave-db:5432/$DB_NAME|" .env
     sed -i "s|POSTGRES_USER=.*|POSTGRES_USER=$DB_USER|" .env
