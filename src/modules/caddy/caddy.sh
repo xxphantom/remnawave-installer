@@ -45,6 +45,16 @@ EOF
         header +Set-Cookie "caddy={$PANEL_SECRET_KEY}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=31536000"
     }
 
+    @subscription_info_path {
+        path_regexp ^/api/sub/[^/]+/info$
+    }
+    handle @subscription_info_path {
+        reverse_proxy {$BACKEND_URL} {
+            header_up X-Real-IP {remote}
+            header_up Host {host}
+        }
+    }
+
     @unauthorized {
         not header Cookie *caddy={$PANEL_SECRET_KEY}*
         not query caddy={$PANEL_SECRET_KEY}
