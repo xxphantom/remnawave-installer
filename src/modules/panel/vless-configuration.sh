@@ -65,7 +65,7 @@ vless_configuration() {
         "realitySettings": {
           "dest": "127.0.0.1:$SELF_STEAL_PORT",
           "show": false,
-          "xver": 1,
+          "xver": 0,
           "shortIds": [
             "$short_id"
           ],

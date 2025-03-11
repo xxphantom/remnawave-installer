@@ -16,35 +16,30 @@ EOF
     
     # Создаем Caddyfile
     cat > Caddyfile << 'EOF'
-{
-    https_port {$SELF_STEAL_PORT}
-    default_bind 127.0.0.1
-    servers {
-        listener_wrappers {
-            proxy_protocol {
-                allow 127.0.0.1/32
-            }
-            tls
-        }
-    }
-    auto_https disable_redirects
-}
+{$SELF_STEAL_DOMAIN}:{$SELF_STEAL_PORT} {
+  @local {
+    remote_ip 127.0.0.1
+  }
 
-https://{$SELF_STEAL_DOMAIN} {
+  handle @local {
     root * /var/www/html
     try_files {path} /index.html
     file_server
+  }
 
+  handle {
+    respond 204
+  }
 }
 
 :{$SELF_STEAL_PORT} {
-    tls internal
-    respond 204
+  bind 0.0.0.0
+  respond 204
 }
 
 :80 {
-    bind 0.0.0.0
-    respond 204
+  bind 0.0.0.0
+  respond 204
 }
 EOF
     
