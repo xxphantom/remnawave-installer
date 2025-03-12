@@ -50,7 +50,7 @@ build: $(BUILD_DIR)
 	@echo '' >> $(BUILD_DIR)/$(TARGET)
 	
 	@# Добавляем остальную часть main.sh после блока импортов
-	@tail -n +61 $(SRC_DIR)/main.sh >> $(BUILD_DIR)/$(TARGET)
+	@tail -n +70 $(SRC_DIR)/main.sh >> $(BUILD_DIR)/$(TARGET)
 	
 	@# Делаем скрипт исполняемым
 	@chmod +x $(BUILD_DIR)/$(TARGET)
