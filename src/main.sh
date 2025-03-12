@@ -26,15 +26,15 @@ source "$SCRIPT_DIR/modules/shared/common.sh" || {
     exit 1
 }
 source "$SCRIPT_DIR/modules/shared/ui.sh" || {
-    echo "Ошибка загрузки модуля shared ui.sh"
+    echo "Ошибка загрузки модуля ui.sh"
     exit 1
 }
-source "$SCRIPT_DIR/modules/shared/dependencies.sh" || {
+source "$SCRIPT_DIR/modules/dependencies/dependencies.sh" || {
     echo "Ошибка загрузки модуля dependencies.sh"
     exit 1
 }
 
-# Эти модули зависят от функций из 00_common.sh и 05_ui.sh, поэтому загружаем их после
+# Эти модули зависят от функций из shared модулей, поэтому загружаем их после
 source "$SCRIPT_DIR/modules/remnawave_json/remnawave_json.sh" || {
     echo "Ошибка загрузки модуля remnawave_json.sh"
     exit 1
@@ -44,17 +44,27 @@ source "$SCRIPT_DIR/modules/caddy/caddy.sh" || {
     exit 1
 }
 
-# Модули с основными функциями установки компонентов
+# Модули для панели управления
+source "$SCRIPT_DIR/modules/panel/ui.sh" || {
+    echo "Ошибка загрузки модуля panel/ui.sh"
+    exit 1
+}
+source "$SCRIPT_DIR/modules/panel/vless-configuration.sh" || {
+    echo "Ошибка загрузки модуля vless-configuration.sh"
+    exit 1
+}
 source "$SCRIPT_DIR/modules/panel/panel.sh" || {
     echo "Ошибка загрузки модуля panel.sh"
     exit 1
 }
-source "$SCRIPT_DIR/modules/node/node.sh" || {
-    echo "Ошибка загрузки модуля node.sh"
-    exit 1
-}
+
+# Остальные модули установки компонентов
 source "$SCRIPT_DIR/modules/selfsteal/selfsteal.sh" || {
     echo "Ошибка загрузки модуля selfsteal.sh"
+    exit 1
+}
+source "$SCRIPT_DIR/modules/node/node.sh" || {
+    echo "Ошибка загрузки модуля node.sh"
     exit 1
 }
 
