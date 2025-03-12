@@ -79,11 +79,12 @@ main() {
 
         echo -e "${BOLD_BLUE_MENU}Пожалуйста, выберите компонент для установки:${NC}"
         echo
-        echo -e "  ${GREEN}1. ${NC}Установить панель Remnawave"
-        echo -e "  ${GREEN}2. ${NC}Установить ноду Remnawave"
-        echo -e "  ${GREEN}3. ${NC}Выход"
+        echo -e "  ${GREEN}1. ${NC}Установить панель"
+        echo -e "  ${GREEN}2. ${NC}Установить ноду"
+        echo -e "  ${GREEN}3. ${NC}Перезапустить панель"
+        echo -e "  ${GREEN}4. ${NC}Выход"
         echo
-        echo -ne "${BOLD_BLUE_MENU}Выберите опцию (1-3): ${NC}"
+        echo -ne "${BOLD_BLUE_MENU}Выберите опцию (1-4): ${NC}"
         read choice
 
         case $choice in
@@ -94,6 +95,9 @@ main() {
             setup_node
             ;;
         3)
+            restart_panel
+            ;;
+        4)
             echo "Готово."
             break
             ;;

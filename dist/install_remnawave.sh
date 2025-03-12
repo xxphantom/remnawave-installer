@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Remnawave Installer (модульная версия)
-# Собрано: Wed Mar 12 07:58:56 UTC 2025
+# Собрано: Wed Mar 12 23:12:01 MSK 2025
 
 # Включение модуля: common.sh
 
@@ -26,45 +26,72 @@ REMNANODE_ROOT_DIR="$HOME/remnanode"
 REMNANODE_DIR="$HOME/remnanode/node"
 SELFSTEAL_DIR="$HOME/remnanode/selfsteal"
 
-# Отрисовка информационного блока
-draw_info_box() {
-    local title="$1"
-    local subtitle="$2"
+# Функция для отображения спиннера во время выполнения команды
+spinner() {
+  local pid=$1
+  local text=$2
+  local spinstr='⣷⣯⣟⡿⢿⣻⣽⣾'
+  local text_code="$BOLD_GREEN"
+  local bg_code=""
+  local effect_code="\033[1m"
+  local delay=0.12
+  local reset_code="$NC"
+
+  printf "${effect_code}${text_code}${bg_code}%s${reset_code}" "$text" > /dev/tty
+
+  while kill -0 "$pid" 2>/dev/null; do
+    for (( i=0; i<${#spinstr}; i++ )); do
+      printf "\r${effect_code}${text_code}${bg_code}[%s] %s${reset_code}" "$(echo -n "${spinstr:$i:1}")" "$text" > /dev/tty
+      sleep $delay
+    done
+  done
+
+  printf "\r\033[K" > /dev/tty
+}
+
+# Функция перезапуска панели Remnawave
+restart_panel() {
+    clear
+    draw_info_box "Панель Remnawave" "Перезапуск панели"
+
+    if [ -d ~/remnawave/panel ]; then
+        echo -e "${BOLD_GREEN}Перезапуск панели Remnawave...${NC}"
+        cd ~/remnawave/panel && make restart
+        echo -e "${BOLD_GREEN}Панель успешно перезапущена!${NC}"
+    else
+        echo -e "${BOLD_RED}Ошибка: установка панели не найдена!${NC}"
+        echo -e "${BOLD_RED}Сначала установите панель Remnawave.${NC}"
+    fi
+
+    echo
+    echo -e "${BOLD_BLUE_MENU}Нажмите Enter, чтобы продолжить...${NC}"
+    read
+}
+
+# Функция для запуска и проверки инициализации контейнера
+start_container() {
+    local directory="$1"      # Директория с docker-compose.yml
+    local container_name="$2" # Имя контейнера для проверки в docker ps
+    local service_name="$3"   # Название сервиса для вывода сообщений
+
+    # Запуск контейнера
+    cd "$directory"
+    docker compose up -d > /dev/null 2>&1 &
+    local docker_pid=$!
     
-    # Фиксированная ширина блока для идеального выравнивания
-    local width=54
+    # Отображаем спиннер во время запуска контейнера
+    spinner $docker_pid "Запуск контейнера ${service_name}..."
     
-    echo -e "${BOLD_GREEN}"
-    # Верхняя граница
-    printf "┌%s┐\n" "$(printf '─%.0s' $(seq 1 $width))"
-    
-    # Центрирование заголовка
-    local title_padding_left=$(( (width - ${#title}) / 2 ))
-    local title_padding_right=$(( width - title_padding_left - ${#title} ))
-    printf "│%*s%s%*s│\n" "$title_padding_left" "" "$title" "$title_padding_right" ""
-    
-    # Центрирование подзаголовка
-    local subtitle_padding_left=$(( (width - ${#subtitle}) / 2 ))
-    local subtitle_padding_right=$(( width - subtitle_padding_left - ${#subtitle} ))
-    printf "│%*s%s%*s│\n" "$subtitle_padding_left" "" "$subtitle" "$subtitle_padding_right" ""
-    
-    # Пустая строка
-    printf "│%*s│\n" "$width" ""
-    
-    # Строка версии - аккуратная обработка цветов
-    local version_text="  • Версия: "
-    local version_value="$VERSION (Бета)"
-    local version_value_colored="${ORANGE}${version_value}${BOLD_GREEN}"
-    local version_value_length=${#version_value}
-    local remaining_space=$(( width - ${#version_text} - version_value_length ))
-    printf "│%s%s%*s│\n" "$version_text" "$version_value_colored" "$remaining_space" ""
-    
-    # Пустая строка
-    printf "│%*s│\n" "$width" ""
-    
-    # Нижняя граница
-    printf "└%s┘\n" "$(printf '─%.0s' $(seq 1 $width))"
-    echo -e "${NC}"
+    # После завершения команды, проверяем статус контейнера
+    if ! docker ps | grep -q "$container_name"; then
+        echo -e "${BOLD_RED}Контейнер $service_name не запустился. Проверьте конфигурацию.${NC}"
+        echo -e "${ORANGE}Вы можете проверить логи позже с помощью 'make logs' в директории $directory.${NC}"
+        return 1
+    else
+        echo -e "${BOLD_GREEN}$service_name успешно запущен.${NC}"
+        echo ""
+        return 0
+    fi
 }
 
 generate_secure_password() {
@@ -75,52 +102,48 @@ generate_secure_password() {
     local lowercase_chars='abcdefghijklmnopqrstuvwxyz'
     local number_chars='0123456789'
     local alphanumeric_chars="${uppercase_chars}${lowercase_chars}${number_chars}"
-    
+
     # Генерируем начальный пароль только из букв и цифр
     if command -v openssl &>/dev/null; then
-        password="$(openssl rand -base64 48 \
-            | tr -dc "$alphanumeric_chars" \
-            | head -c "$length")"
+        password="$(openssl rand -base64 48 | tr -dc "$alphanumeric_chars" | head -c "$length")"
     else
         # Если openssl недоступен, fallback на /dev/urandom
-        password="$(head -c 100 /dev/urandom \
-            | tr -dc "$alphanumeric_chars" \
-            | head -c "$length")"
+        password="$(head -c 100 /dev/urandom | tr -dc "$alphanumeric_chars" | head -c "$length")"
     fi
-    
+
     # Проверяем наличие символов каждого типа и добавляем недостающие
     # Если нет символа верхнего регистра, добавляем его
     if ! [[ "$password" =~ [$uppercase_chars] ]]; then
         local position=$((RANDOM % length))
         local one_uppercase="$(echo "$uppercase_chars" | fold -w1 | shuf | head -n1)"
-        password="${password:0:$position}${one_uppercase}${password:$((position+1))}"
+        password="${password:0:$position}${one_uppercase}${password:$((position + 1))}"
     fi
-    
+
     # Если нет символа нижнего регистра, добавляем его
     if ! [[ "$password" =~ [$lowercase_chars] ]]; then
         local position=$((RANDOM % length))
         local one_lowercase="$(echo "$lowercase_chars" | fold -w1 | shuf | head -n1)"
-        password="${password:0:$position}${one_lowercase}${password:$((position+1))}"
+        password="${password:0:$position}${one_lowercase}${password:$((position + 1))}"
     fi
-    
+
     # Если нет цифры, добавляем её
     if ! [[ "$password" =~ [$number_chars] ]]; then
         local position=$((RANDOM % length))
         local one_number="$(echo "$number_chars" | fold -w1 | shuf | head -n1)"
-        password="${password:0:$position}${one_number}${password:$((position+1))}"
+        password="${password:0:$position}${one_number}${password:$((position + 1))}"
     fi
-    
+
     # Добавляем от 1 до 3 специальных символов (в зависимости от длины пароля)
     # но не более 25% длины пароля
     local special_count=$((length / 4))
     special_count=$((special_count > 0 ? special_count : 1))
     special_count=$((special_count < 3 ? special_count : 3))
-    
-    for ((i=0; i<special_count; i++)); do
+
+    for ((i = 0; i < special_count; i++)); do
         # Выбираем случайную позицию, избегая первого и последнего символа
         local position=$((RANDOM % (length - 2) + 1))
         local one_special="$(echo "$special_chars" | fold -w1 | shuf | head -n1)"
-        password="${password:0:$position}${one_special}${password:$((position+1))}"
+        password="${password:0:$position}${one_special}${password:$((position + 1))}"
     done
 
     echo "$password"
@@ -129,7 +152,7 @@ generate_secure_password() {
 # Создание общего Makefile для управления сервисами
 create_makefile() {
     local directory="$1"
-    cat > "$directory/Makefile" << 'EOF'
+    cat >"$directory/Makefile" <<'EOF'
 .PHONY: start stop restart logs
 
 start:
@@ -143,36 +166,6 @@ logs:
 EOF
 }
 
-register_user() {
-    local panel_url="$1"
-    local panel_domain="$2"
-    local username="$3"
-    local password="$4"
-    local api_url="http://${panel_url}/api/auth/register"
-    
-    local response=$(curl -s "$api_url" \
-    -H "Host: $panel_domain" \
-    -H "X-Forwarded-For: $panel_url" \
-    -H "X-Forwarded-Proto: https" \
-    -H "Content-Type: application/json" \
-    --data-raw '{"username":"'"$username"'","password":"'"$password"'"}')
-    
-	if [ -z "$response" ]; then
-		echo "Ошибка при регистрации - пустой ответ сервера"
-        return 1
-	fi
-
-    if [[ "$response" == *"accessToken"* ]]; then
-    	local token=$(echo "$response" | jq -r '.response.accessToken')
-        
-        echo "$token"
-        return 0
-    else
-        echo "$response"
-        return 1
-    fi
-}
-
 # ===================================================================================
 #                                ФУНКЦИИ ВАЛИДАЦИИ
 # ===================================================================================
@@ -183,49 +176,51 @@ register_user() {
 #   validate_domain "example.com"
 validate_domain() {
     local input="$1"
-    local max_length="${2:-253}"  # Максимальная длина домена по стандарту
-    
+    local max_length="${2:-253}" # Максимальная длина домена по стандарту
+
     # Проверка на IP-адрес
     if [[ "$input" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         # Проверка каждого октета IP-адреса
         local valid_ip=true
-        IFS='.' read -r -a octets <<< "$input"
+        IFS='.' read -r -a octets <<<"$input"
         for octet in "${octets[@]}"; do
             if [[ ! "$octet" =~ ^[0-9]+$ ]] || [ "$octet" -gt 255 ]; then
                 valid_ip=false
                 break
             fi
         done
-        
+
         if [ "$valid_ip" = true ]; then
             echo "$input"
             return 0
         fi
     fi
-    
+
     # Удаляем все символы, кроме букв, цифр, точек и дефисов
     local cleaned_domain=$(echo "$input" | tr -cd 'a-zA-Z0-9.-')
-    
+
     # Проверка на пустую строку после очистки
     if [ -z "$cleaned_domain" ]; then
         echo ""
         return 1
     fi
-    
+
     # Проверка на максимальную длину
     if [ ${#cleaned_domain} -gt $max_length ]; then
         cleaned_domain=${cleaned_domain:0:$max_length}
     fi
-    
+
     # Проверка формата домена (простая базовая проверка)
     # Домен должен содержать хотя бы одну точку и не начинаться/заканчиваться точкой или дефисом
-    if [[ ! "$cleaned_domain" =~ \. ]] || \
-       [[ "$cleaned_domain" =~ ^[\.-] ]] || \
-       [[ "$cleaned_domain" =~ [\.-]$ ]]; then
+    if
+        [[ ! "$cleaned_domain" =~ \. ]] || \
+        [[ "$cleaned_domain" =~ ^[\.-] ]] || \
+        [[ "$cleaned_domain" =~ [\.-]$ ]]
+    then
         echo "$cleaned_domain"
         return 1
     fi
-    
+
     echo "$cleaned_domain"
     return 0
 }
@@ -237,10 +232,10 @@ validate_domain() {
 validate_port() {
     local input="$1"
     local default_port="$2"
-    
+
     # Удаляем все символы, кроме цифр
     local cleaned_port=$(echo "$input" | tr -cd '0-9')
-    
+
     # Проверка на пустую строку после очистки
     if [ -z "$cleaned_port" ] && [ -n "$default_port" ]; then
         echo "$default_port"
@@ -249,7 +244,7 @@ validate_port() {
         echo ""
         return 1
     fi
-    
+
     # Проверка на диапазон портов
     if [ "$cleaned_port" -lt 1 ] || [ "$cleaned_port" -gt 65535 ]; then
         if [ -n "$default_port" ]; then
@@ -260,7 +255,7 @@ validate_port() {
             return 1
         fi
     fi
-    
+
     echo "$cleaned_port"
     return 0
 }
@@ -274,27 +269,28 @@ read_domain() {
     local max_attempts="${3:-3}"
     local result=""
     local attempts=0
-    
+
     while [ $attempts -lt $max_attempts ]; do
         # Показываем подсказку с дефолтным значением, если оно есть
+        local prompt_formatted_text=""
         if [ -n "$default_value" ]; then
-            echo -e "${ORANGE}${prompt} [$default_value]:${NC}" >&2
+            prompt_formatted_text="${ORANGE}${prompt} [$default_value]:${NC}"
         else
-            echo -e "${ORANGE}${prompt}:${NC}" >&2
+            prompt_formatted_text="${ORANGE}${prompt}:${NC}"
         fi
-        
-        read -p "> " input
-        
+
+        read -p "$prompt_formatted_text" input
+
         # Если ввод пустой и есть дефолтное значение, используем его
         if [ -z "$input" ] && [ -n "$default_value" ]; then
             result="$default_value"
             break
         fi
-        
+
         # Валидируем ввод
         result=$(validate_domain "$input")
         local status=$?
-        
+
         if [ $status -eq 0 ]; then
             break
         else
@@ -304,12 +300,12 @@ read_domain() {
             ((attempts++))
         fi
     done
-    
+
     if [ $attempts -eq $max_attempts ]; then
         echo -e "${BOLD_RED}Превышено максимальное количество попыток. Используется значение по умолчанию: $default_value${NC}" >&2
         result="$default_value"
     fi
-    
+
     echo "$result"
 }
 
@@ -322,27 +318,26 @@ read_port() {
     local max_attempts="${3:-3}"
     local result=""
     local attempts=0
-    
+
     while [ $attempts -lt $max_attempts ]; do
         # Показываем подсказку с дефолтным значением, если оно есть
         if [ -n "$default_value" ]; then
-            echo -e "${ORANGE}${prompt} [$default_value]:${NC}" >&2
+            read -p "${ORANGE}${prompt} [$default_value]:${NC}" input
         else
-            echo -e "${ORANGE}${prompt}:${NC}" >&2
+            read -p "${ORANGE}${prompt}:${NC}" input
         fi
-        
-        read -p "> " input
-        
+
+
         # Если ввод пустой и есть дефолтное значение, используем его
         if [ -z "$input" ] && [ -n "$default_value" ]; then
             result="$default_value"
             break
         fi
-        
+
         # Валидируем ввод
         result=$(validate_port "$input" "$default_value")
         local status=$?
-        
+
         if [ $status -eq 0 ]; then
             break
         else
@@ -350,12 +345,12 @@ read_port() {
             ((attempts++))
         fi
     done
-    
+
     if [ $attempts -eq $max_attempts ]; then
         echo -e "${BOLD_RED}Превышено максимальное количество попыток. Используется значение по умолчанию: $default_value${NC}" >&2
         result="$default_value"
     fi
-    
+
     echo "$result"
 }
 
@@ -398,6 +393,329 @@ draw_info_box() {
     # Нижняя граница
     printf "└%s┘\n" "$(printf '─%.0s' $(seq 1 $width))"
     echo -e "${NC}"
+}
+
+# Очистка экрана
+clear_screen() {
+    clear
+}
+
+# Отображение заголовка раздела
+draw_section_header() {
+    local title="$1"
+    local width=${2:-50}
+    
+    echo -e "${BOLD_RED}\033[1m┌$(printf '─%.0s' $(seq 1 $width))┐\033[0m${NC}"
+    
+    # Центрирование заголовка
+    local padding_left=$(((width - ${#title}) / 2))
+    local padding_right=$((width - padding_left - ${#title}))
+    echo -e "${BOLD_RED}\033[1m│$(printf ' %.0s' $(seq 1 $padding_left))$title$(printf ' %.0s' $(seq 1 $padding_right))│\033[0m${NC}"
+    
+    echo -e "${BOLD_RED}\033[1m└$(printf '─%.0s' $(seq 1 $width))┘\033[0m${NC}"
+    echo
+}
+
+# Отображение опций меню с нумерацией
+draw_menu_options() {
+    local options=("$@")
+    local idx=1
+    
+    for option in "${options[@]}"; do
+        echo -e "${ORANGE}$idx. $option${NC}"
+        ((idx++))
+    done
+    echo
+}
+
+# Запрос ввода с предустановленным текстом и цветом
+prompt_input() {
+    local prompt_text="$1"
+    local prompt_color="${2:-$GREEN}"
+    
+    echo -ne "${prompt_color}${prompt_text}${NC}" >&2
+    read input_value
+    echo >&2
+    
+    echo "$input_value"
+}
+
+# Запрос ввода пароля (с отключением эхо)
+prompt_password() {
+    local prompt_text="$1"
+    local prompt_color="${2:-$ORANGE}"
+    
+    echo -ne "${prompt_color}${prompt_text}${NC}" >&2
+    stty -echo
+    read password_value
+    stty echo
+    echo >&2
+    
+    echo "$password_value"
+}
+
+# Запрос выбора опции (y/n)
+prompt_yes_no() {
+    local prompt_text="$1"
+    local prompt_color="${2:-$GREEN}"
+    local default="${3:-}"
+    
+    local prompt_suffix=" (y/n): "
+    [ -n "$default" ] && prompt_suffix=" (y/n) [$default]: "
+    
+    echo -ne "${prompt_color}${prompt_text}${prompt_suffix}${NC}" >&2
+    read answer
+    echo >&2
+    
+    # Преобразование в нижний регистр
+    answer=$(echo "$answer" | tr '[:upper:]' '[:lower:]')
+    
+    # Если пусто, используем значение по умолчанию
+    [ -z "$answer" ] && answer="$default"
+    
+    if [ "$answer" = "y" ] || [ "$answer" = "yes" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Выбор опции из нумерованного меню
+prompt_menu_option() {
+    local prompt_text="$1"
+    local prompt_color="${2:-$GREEN}"
+    local min="${3:-1}"
+    local max="$4"
+    
+    local selected_option
+    while true; do
+        echo -ne "${prompt_color}${prompt_text} (${min}-${max}): ${NC}" >&2
+        read selected_option
+        echo >&2
+        
+        # Валидация выбора
+        if [[ "$selected_option" =~ ^[0-9]+$ ]] && \
+           [ "$selected_option" -ge "$min" ] && \
+           [ "$selected_option" -le "$max" ]; then
+            break
+        else
+            echo -e "${BOLD_RED}Пожалуйста, введите число от ${min} до ${max}.${NC}" >&2
+        fi
+    done
+    
+    echo "$selected_option"
+}
+
+# Отображение сообщения об успехе
+show_success() {
+    local message="$1"
+    echo -e "${BOLD_GREEN}✓ ${message}${NC}"
+    echo ""
+}
+
+# Отображение сообщения об ошибке
+show_error() {
+    local message="$1"
+    echo -e "${BOLD_RED}✗ ${message}${NC}"
+    echo ""
+}
+
+# Отображение предупреждения
+show_warning() {
+    local message="$1"
+    echo -e "${BOLD_YELLOW}⚠  ${message}${NC}"
+    echo ""
+}
+
+# Отображение информационного сообщения
+show_info() {
+    local message="$1"
+    local color="${2:-$ORANGE}"
+    echo -e "${color}${message}${NC}"
+    echo ""
+}
+
+# Отображение разделителя
+draw_separator() {
+    local width=${1:-50}
+    local char=${2:-"-"}
+    
+    printf "%s\n" "$(printf "$char%.0s" $(seq 1 $width))"
+}
+
+# Отображение прогресса операции
+show_progress() {
+    local message="$1"
+    local progress_char=${2:-"."}
+    local count=${3:-3}
+    
+    echo -ne "${message}"
+    for ((i=0; i<count; i++)); do
+        echo -ne "${progress_char}"
+        sleep 0.5
+    done
+    echo ""
+}
+
+# Запрос домена с валидацией
+prompt_domain() {
+    local prompt_text="$1"
+    local prompt_color="${2:-$ORANGE}"
+    
+    local domain
+    while true; do
+        echo -ne "${prompt_color}${prompt_text}: ${NC}" >&2
+        read domain
+        echo >&2
+        
+        # Базовая валидация домена (может быть расширена)
+        if [[ "$domain" =~ ^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$ ]]; then
+            break
+        else
+            echo -e "${BOLD_RED}Неверный формат домена. Пожалуйста, попробуйте снова.${NC}" >&2
+        fi
+    done
+    
+    echo "$domain"
+    echo ""
+}
+
+# Запрос числового значения с валидацией
+prompt_number() {
+    local prompt_text="$1"
+    local prompt_color="${2:-$ORANGE}"
+    local min="${3:-1}"
+    local max="${4:-}"
+    
+    local number
+    while true; do
+        echo -ne "${prompt_color}${prompt_text}: ${NC}" >&2
+        read number
+        echo >&2
+        
+        # Валидация числа
+        if [[ "$number" =~ ^[0-9]+$ ]]; then
+            if [ -n "$min" ] && [ "$number" -lt "$min" ]; then
+                echo -e "${BOLD_RED}Значение должно быть не меньше ${min}.${NC}" >&2
+                continue
+            fi
+            
+            if [ -n "$max" ] && [ "$number" -gt "$max" ]; then
+                echo -e "${BOLD_RED}Значение должно быть не больше ${max}.${NC}" >&2
+                continue
+            fi
+            
+            break
+        else
+            echo -e "${BOLD_RED}Пожалуйста, введите корректное числовое значение.${NC}" >&2
+        fi
+    done
+    
+    echo "$number"
+}
+
+# Отображение ряда с заголовком и значением
+draw_info_row() {
+    local label="$1"
+    local value="$2"
+    local label_color="${3:-$ORANGE}"
+    local value_color="${4:-$GREEN}"
+    local width=${5:-50}
+    
+    local label_display="${label_color}${label}:${NC}"
+    local value_display="${value_color}${value}${NC}"
+    
+    echo -e "${label_display} ${value_display}"
+}
+
+# Центрирование текста
+center_text() {
+    local text="$1"
+    local width=${2:-$(tput cols)}
+    local padding_left=$(((width - ${#text}) / 2))
+    
+    printf "%${padding_left}s%s\n" "" "$text"
+}
+
+# Отображение блока с завершающим сообщением
+draw_completion_message() {
+    local title="$1"
+    local message="$2"
+    local width=${3:-70}
+    
+    draw_separator "$width" "="
+    center_text "$title" "$width"
+    echo
+    echo -e "$message"
+    draw_separator "$width" "="
+}
+
+# Валидация пароля на сложность
+validate_password_strength() {
+    local password="$1"
+    local min_length=${2:-8}
+    
+    local length=${#password}
+    
+    # Проверка длины
+    if [ "$length" -lt "$min_length" ]; then
+        echo "Пароль должен содержать не менее $min_length символов."
+        return 1
+    fi
+    
+    # Проверка наличия цифр
+    if ! [[ "$password" =~ [0-9] ]]; then
+        echo "Пароль должен содержать хотя бы одну цифру."
+        return 1
+    fi
+    
+    # Проверка наличия букв нижнего регистра
+    if ! [[ "$password" =~ [a-z] ]]; then
+        echo "Пароль должен содержать хотя бы одну букву нижнего регистра."
+        return 1
+    fi
+    
+    # Проверка наличия букв верхнего регистра
+    if ! [[ "$password" =~ [A-Z] ]]; then
+        echo "Пароль должен содержать хотя бы одну букву верхнего регистра."
+        return 1
+    fi
+    
+    # Пароль прошел все проверки
+    return 0
+}
+
+# Запрос пароля с подтверждением и проверкой сложности
+prompt_secure_password() {
+    local prompt_text="$1"
+    local confirm_text="${2:-Повторно введите пароль для подтверждения}"
+    local min_length=${3:-8}
+    
+    local password1 password2 error_message
+    
+    while true; do
+        # Запрашиваем пароль
+        password1=$(prompt_password "$prompt_text")
+        
+        # Проверяем сложность пароля
+        error_message=$(validate_password_strength "$password1" "$min_length")
+        if [ $? -ne 0 ]; then
+            echo -e "${BOLD_RED}${error_message} Пожалуйста, попробуйте снова.${NC}" >&2
+            continue
+        fi
+        
+        # Запрашиваем подтверждение пароля
+        password2=$(prompt_password "$confirm_text")
+        
+        # Проверяем совпадение паролей
+        if [ "$password1" = "$password2" ]; then
+            break
+        else
+            echo -e "${BOLD_RED}Пароли не совпадают. Пожалуйста, попробуйте снова.${NC}" >&2
+        fi
+    done
+    
+    echo "$password1"
 }
 
 # Включение модуля: dependencies.sh
@@ -753,8 +1071,11 @@ display_panel_installation_complete_message() {
     print_empty_line
     print_text_line "Логин администратора: $SUPERADMIN_USERNAME"
     print_text_line "Пароль администратора: $SUPERADMIN_PASSWORD"
-    
+    print_empty_line
     echo -e "\033[1m└${border_line}┘\033[0m"
+
+    echo
+    show_success "Данные сохранены в файле: $CREDENTIALS_FILE"
     echo
     echo -e "${BOLD_BLUE}Директория панели: ${NC}$REMNAWAVE_DIR/panel"
     echo -e "${BOLD_BLUE}Директория Caddy: ${NC}$REMNAWAVE_DIR/caddy"
@@ -1036,30 +1357,95 @@ EOF
 #                              УСТАНОВКА ПАНЕЛИ REMNAWAVE
 # ===================================================================================
 
+wait_for_panel() {
+    local panel_url="$1"
+    local max_wait=180
+    local temp_file=$(mktemp)
+    
+    # Запускаем проверку доступности сервера в фоновом процессе
+    {
+        local start_time=$(date +%s)
+        local end_time=$((start_time + max_wait))
+        
+        while [ $(date +%s) -lt $end_time ]; do
+            if curl -s --connect-timeout 1 "http://$panel_url/api/auth/register" >/dev/null; then
+                echo "success" > "$temp_file"
+                exit 0
+            fi
+            sleep 1
+        done
+        echo "timeout" > "$temp_file"
+        exit 1
+    } &
+    local check_pid=$!
+    
+    spinner "$check_pid" "Ожидание инициализации панели..."
+    
+    if [ "$(cat "$temp_file")" = "success" ]; then
+        show_success "Панель готова к работе!"
+        rm -f "$temp_file"
+        return 0
+    else
+        show_warning "Превышено максимальное время ожидания ($max_wait секунд)."
+        show_info "Пробуем продолжить регистрацию в любом случае..."
+        rm -f "$temp_file"
+        return 1
+    fi
+}
+
+register_user() {
+    local panel_url="$1"
+    local panel_domain="$2"
+    local username="$3"
+    local password="$4"
+    local api_url="http://${panel_url}/api/auth/register"
+
+    local reg_token=""
+    local reg_error=""
+
+    local response=$(
+        curl -s "$api_url" \
+        -H "Host: $panel_domain" \
+        -H "X-Forwarded-For: $panel_url" \
+        -H "X-Forwarded-Proto: https" \
+        -H "Content-Type: application/json" \
+        --data-raw '{"username":"'"$username"'","password":"'"$password"'"}'
+    )
+
+    if [ -z "$response" ]; then
+        reg_error="Пустой ответ сервера"
+        return 1
+    elif [[ "$response" == *"accessToken"* ]]; then
+        # Успешная регистрация
+        reg_token=$(echo "$response" | jq -r '.response.accessToken')
+        echo "$reg_token"
+        return 0
+    else
+        echo "$response"
+        return 1
+    fi
+}
+
 install_panel() {
-    clear
+    clear_screen
 
     # Проверка наличия предыдущей установки
     if [ -d "$REMNAWAVE_DIR" ]; then
-        echo -e "${BOLD_YELLOW}Обнаружена предыдущая установка RemnaWave.${NC}"
-        echo -ne "${ORANGE}Хотите удалить предыдущую установку перед продолжением? (y/n): ${NC}"
-        read REMOVE_PREVIOUS
-        REMOVE_PREVIOUS=$(echo "$REMOVE_PREVIOUS" | tr '[:upper:]' '[:lower:]')
-        echo
+        show_warning "Обнаружена предыдущая установка RemnaWave."
 
-        if [ "$REMOVE_PREVIOUS" = "y" ] || [ "$REMOVE_PREVIOUS" = "yes" ]; then
-            echo -e "${BOLD_YELLOW}Удаление предыдущей установки...${NC}"
+        if prompt_yes_no "Хотите удалить предыдущую установку перед продолжением?" "$ORANGE"; then
+            show_warning "Удаление предыдущей установки..."
 
             cd $REMNAWAVE_DIR && \
-            docker compose -f panel/docker-compose.yml down 2>/dev/null || true
-            docker compose -f caddy/docker-compose.yml down 2>/dev/null || true
-            docker compose -f remnawave-json/docker-compose.yml down 2>/dev/null || true
+            docker compose -f panel/docker-compose.yml down 1>/dev/null || true
+            docker compose -f caddy/docker-compose.yml down 1>/dev/null || true
+            docker compose -f remnawave-json/docker-compose.yml down 1>/dev/null || true
             rm -rf $REMNAWAVE_DIR
-            docker volume rm remnawave-db-data remnawave-redis-data 2>/dev/null || true
+            docker volume rm remnawave-db-data remnawave-redis-data 1>/dev/null || true
 
-            echo -e "${BOLD_GREEN}Предыдущая установка успешно удалена.${NC}"
+            show_success "Проведено удаление предыдущей установки."
         else
-            echo -e "${BOLD_YELLOW}Продолжаем установку без удаления предыдущей.${NC}"
+            show_warning "Продолжаем установку без удаления предыдущей."
         fi
     fi
 
@@ -1085,98 +1471,50 @@ install_panel() {
     curl -s -o .env https://raw.githubusercontent.com/remnawave/backend/refs/heads/dev/.env.sample
 
     # Спрашиваем, нужна ли интеграция с Telegram
-    echo -ne "${GREEN}Хотите включить интеграцию с Telegram? (y/n): ${NC}"
-    read IS_TELEGRAM_ENABLED
-    IS_TELEGRAM_ENABLED=$(echo "$IS_TELEGRAM_ENABLED" | tr '[:upper:]' '[:lower:]')
-    echo
-
-    # Преобразование y/n в true/false для файла .env
-    if [ "$IS_TELEGRAM_ENABLED" = "y" ] || [ "$IS_TELEGRAM_ENABLED" = "yes" ]; then
+    if prompt_yes_no "Хотите включить интеграцию с Telegram?"; then
         IS_TELEGRAM_ENV_VALUE="true"
         # Если интеграция с Telegram включена, запрашиваем параметры
-        echo -ne "${ORANGE}Введите токен вашего Telegram бота: ${NC}"
-        read TELEGRAM_BOT_TOKEN
-        echo
-
-        echo -ne "${ORANGE}Введите ID администратора Telegram: ${NC}"
-        read TELEGRAM_ADMIN_ID
-        echo
-
-        echo -ne "${ORANGE}Введите ID чата для уведомлений: ${NC}"
-        read NODES_NOTIFY_CHAT_ID
-        echo
+        TELEGRAM_BOT_TOKEN=$(prompt_input "Введите токен вашего Telegram бота: " "$ORANGE")
+        TELEGRAM_ADMIN_ID=$(prompt_input "Введите ID администратора Telegram: " "$ORANGE")
+        NODES_NOTIFY_CHAT_ID=$(prompt_input "Введите ID чата для уведомлений: " "$ORANGE")
     else
         # Если интеграция с Telegram не включена, устанавливаем параметры в "change-me"
         IS_TELEGRAM_ENV_VALUE="false"
-        echo -e "${BOLD_YELLOW}Пропуск интеграции с Telegram.${NC}"
+        show_warning "Пропуск интеграции с Telegram."
         TELEGRAM_BOT_TOKEN="change-me"
         TELEGRAM_ADMIN_ID="change-me"
         NODES_NOTIFY_CHAT_ID="change-me"
     fi
 
     # Запрашиваем основной домен для панели с валидацией
-    SCRIPT_PANEL_DOMAIN=$(read_domain "Введите основной домен для вашей панели (например, panel.example.com)")
-    echo
+    SCRIPT_PANEL_DOMAIN=$(prompt_domain "Введите основной домен для вашей панели (например, panel.example.com)")
 
     # Запрашиваем домен для подписок с валидацией
-    SCRIPT_SUB_DOMAIN=$(read_domain "Введите домен для подписок (например, subs.example.com)")
-    echo
+    SCRIPT_SUB_DOMAIN=$(prompt_domain "Введите домен для подписок (например, subs.example.com)")
 
     # Запрос на установку remnawave-json
-    echo -ne "${GREEN}Установить remnawave-json https://github.com/Jolymmiles/remnawave-json ? (y/n): ${NC}"
-    read INSTALL_REMNAWAVE_JSON
-    INSTALL_REMNAWAVE_JSON=$(echo "$INSTALL_REMNAWAVE_JSON" | tr '[:upper:]' '[:lower:]')
-    echo
+    if prompt_yes_no "Установить remnawave-json https://github.com/Jolymmiles/remnawave-json ?"; then
+        INSTALL_REMNAWAVE_JSON="y"
+    else
+        INSTALL_REMNAWAVE_JSON="n"
+    fi
 
-    echo -e "${BOLD_RED}\033[1m┌────────────────────────────────────────────┐\033[0m${NC}"
-    echo -e "${BOLD_RED}\033[1m│     Выберите способ создания пароля:       │\033[0m${NC}"
-    echo -e "${BOLD_RED}\033[1m└────────────────────────────────────────────┘\033[0m${NC}"
-    echo
-    echo -e "${ORANGE}1. Ввести пароль вручную${NC}"
-    echo -e "${ORANGE}2. Автоматически сгенерировать надежный пароль${NC}"
-    echo
-    echo -ne "${GREEN}Выберите опцию (1-2): ${NC}"
-    read password_option
-    echo
+    # Выбор способа создания пароля
+    draw_section_header "Выберите способ создания пароля" 50
 
-    echo -ne "${ORANGE}Пожалуйста, введите имя пользователя SuperAdmin: ${NC}"
-    read SUPERADMIN_USERNAME
-    echo
+    draw_menu_options "Ввести пароль вручную" "Автоматически сгенерировать надежный пароль"
+
+    password_option=$(prompt_menu_option "Выберите опцию" "$GREEN" 1 2)
+
+    SUPERADMIN_USERNAME=$(prompt_input "Пожалуйста, введите имя пользователя SuperAdmin: " "$ORANGE")
 
     if [ "$password_option" = "1" ]; then
         # Ручной ввод пароля
-        while true; do
-            echo -ne "${ORANGE}Введите пароль SuperAdmin (минимум 24 символа, должен содержать буквы разного регистра и цифры): ${NC}"
-            stty -echo
-            read PASSWORD1
-            stty echo
-            echo
-
-            # Проверка длины пароля
-            if [ ${#PASSWORD1} -lt 24 ]; then
-                echo -e "${BOLD_RED}Пароль должен содержать не менее 24 символов. Пожалуйста, попробуйте снова.${NC}"
-                continue
-            fi
-
-            echo -ne "${BOLD_RED}Повторно введите пароль SuperAdmin для подтверждения: ${NC}"
-            stty -echo
-            read PASSWORD2
-            stty echo
-            echo
-
-            if [ "$PASSWORD1" = "$PASSWORD2" ]; then
-                SUPERADMIN_PASSWORD=$PASSWORD1
-                break
-            else
-                echo -e "${BOLD_RED}Пароли не совпадают. Пожалуйста, попробуйте снова.${NC}"
-            fi
-        done
+        SUPERADMIN_PASSWORD=$(prompt_secure_password "Введите пароль SuperAdmin (минимум 24 символа, должен содержать буквы разного регистра и цифры): " "Повторно введите пароль SuperAdmin для подтверждения: " 24)
     else
         # Автоматическая генерация пароля
         SUPERADMIN_PASSWORD=$(generate_secure_password 25)
-        echo -e "${BOLD_GREEN}Сгенерирован надежный пароль: ${BOLD_RED}$SUPERADMIN_PASSWORD${NC}"
-        echo -e "${ORANGE}Обязательно сохраните этот пароль в надежном месте!${NC}"
-        echo
+        show_success "Сгенерирован надежный пароль: ${BOLD_RED}$SUPERADMIN_PASSWORD"
     fi
 
     sed -i "s|JWT_AUTH_SECRET=change_me|JWT_AUTH_SECRET=$JWT_AUTH_SECRET|" .env
@@ -1192,20 +1530,8 @@ install_panel() {
     sed -i "s|POSTGRES_DB=.*|POSTGRES_DB=$DB_NAME|" .env
     sed -i "s|METRICS_PASS=.*|METRICS_PASS=$METRICS_PASS|" .env
 
-    # Обрабатываем superadmin username и password - добавляем или обновляем переменные
-    if grep -q "^SUPERADMIN_USERNAME=" .env; then
-        sed -i "s|^SUPERADMIN_USERNAME=.*|SUPERADMIN_USERNAME=$SUPERADMIN_USERNAME|" .env
-    else
-        echo "SUPERADMIN_USERNAME=$SUPERADMIN_USERNAME" >>.env
-    fi
-
-    if grep -q "^SUPERADMIN_PASSWORD=" .env; then
-        sed -i "s|^SUPERADMIN_PASSWORD=.*|SUPERADMIN_PASSWORD=$SUPERADMIN_PASSWORD|" .env
-    else
-        echo "SUPERADMIN_PASSWORD=$SUPERADMIN_PASSWORD" >>.env
-    fi
-
-    sleep 3
+    # Генерация секретного ключа для защиты панели управления
+    PANEL_SECRET_KEY=$(openssl rand -hex 16)
 
     # Создаем docker-compose.yml для панели
     curl -s -o docker-compose.yml https://raw.githubusercontent.com/remnawave/backend/refs/heads/dev/docker-compose-prod.yml
@@ -1217,80 +1543,53 @@ install_panel() {
     create_makefile "$REMNAWAVE_DIR/panel"
 
     # ===================================================================================
-    # Установка и настройка remnawave-json
+    # Установка remnawave-json
     # ===================================================================================
 
     setup_remnawave_json
 
     # ===================================================================================
-    # Установка и настройка Caddy для панели и подписок
+    # Установка Caddy для панели и подписок
     # ===================================================================================
 
-    # Генерация секретного ключа для защиты панели управления
-    PANEL_SECRET_KEY=$(openssl rand -hex 16)
-    
-    # Передаем секретный ключ в функцию настройки Caddy
     setup_caddy_for_panel "$PANEL_SECRET_KEY"
 
     # Запуск всех контейнеров
-    echo -e "${BOLD_GREEN}Запуск контейнеров...${NC}"
+    show_info "Запуск контейнеров..." "$BOLD_GREEN"
 
     # Запуск панели RemnaWave
-    cd $REMNAWAVE_DIR/panel
-    docker compose up -d
+    start_container "$REMNAWAVE_DIR/panel" "remnawave/backend" "Remnawave"
 
     # Запуск Caddy
-    cd $REMNAWAVE_DIR/caddy
-    docker compose up -d
-
-    # Ждем инициализации Caddy
-    sleep 5
-    if ! docker ps | grep -q "caddy-remnawave"; then
-        echo -e "${BOLD_RED}Caddy контейнер не запустился. Проверьте вашу конфигурацию домена.${NC}"
-        echo -e "${ORANGE}Вы можете проверить логи позже с помощью 'make logs' в директории $REMNAWAVE_DIR/caddy.${NC}"
-    else
-        echo -e "${BOLD_GREEN}Caddy reverse proxy успешно запущен.${NC}"
-    fi
-
-    # Ждем инициализации панели
-    sleep 5
-    if ! docker ps | grep -q "remnawave/backend"; then
-        echo -e "${BOLD_RED}RemaWave контейнер не запустился.${NC}"
-        echo -e "${ORANGE}Вы можете проверить логи позже с помощью 'make logs' в директории $REMNAWAVE_DIR/panel.${NC}"
-    else
-        echo -e "${BOLD_GREEN}Контейнеры панели RemnaWave запущены.${NC}"
-    fi
+    start_container "$REMNAWAVE_DIR/caddy" "caddy-remnawave" "Caddy"
 
     # Запуск remnawave-json (если был выбран)
     if [ "$INSTALL_REMNAWAVE_JSON" = "y" ] || [ "$INSTALL_REMNAWAVE_JSON" = "yes" ]; then
-        cd $REMNAWAVE_DIR/remnawave-json
-        docker compose up -d
-
-        # Ждем инициализации контейнера
-        sleep 5
-        if ! docker ps | grep -q "remnawave-json"; then
-            echo -e "${BOLD_RED}Контейнер remnawave-json не запустился. Проверьте конфигурацию.${NC}"
-            echo -e "${ORANGE}Вы можете проверить логи позже с помощью 'make logs' в директории $REMNAWAVE_DIR/remnawave-json.${NC}"
-        else
-            echo -e "${BOLD_GREEN}remnawave-json успешно запущен.${NC}"
-        fi
+        start_container "$REMNAWAVE_DIR/remnawave-json" "remnawave-json" "remnawave-json"
     fi
 
-    sleep 5
-    # Регистрация пользователя и получение токена
-    local reg_token=$(register_user "127.0.0.1:3000" "$SCRIPT_PANEL_DOMAIN" "$SUPERADMIN_USERNAME" "$SUPERADMIN_PASSWORD")
-    local reg_status=$?
+    wait_for_panel "127.0.0.1:3000"
 
-    if [ $reg_status -eq 0 ]; then
-        echo -e "${GREEN}✓ Регистрация пользователя выполнена успешно${NC}"
-        echo
-        echo -e "${GREEN} Получен токен: $reg_token${NC}"
-        echo
-        vless_configuration "127.0.0.1:3000" "$SCRIPT_PANEL_DOMAIN" "$reg_token"
+    REG_TOKEN=$(register_user "127.0.0.1:3000" "$SCRIPT_PANEL_DOMAIN" "$SUPERADMIN_USERNAME" "$SUPERADMIN_PASSWORD")
+
+    if [ -n "$REG_TOKEN" ]; then
+        vless_configuration "127.0.0.1:3000" "$SCRIPT_PANEL_DOMAIN" "$REG_TOKEN"
     else
-        echo -e "${RED}✗ Ошибка при регистрации пользователя, конфигурация не выполнена.${NC}"
-        echo -e "${GRAY}Ответ сервера: $reg_token${NC}"
+        show_error "Не удалось зарегистрировать пользователя."
     fi
+
+    # Сохранение учетных данных в файл
+    CREDENTIALS_FILE="$REMNAWAVE_DIR/panel/credentials.txt"
+    echo "PANEL DOMAIN: $SCRIPT_PANEL_DOMAIN" >>"$CREDENTIALS_FILE"
+    echo "PANEL URL: https://$SCRIPT_PANEL_DOMAIN?key=$PANEL_SECRET_KEY" >>"$CREDENTIALS_FILE"
+    echo "" >>"$CREDENTIALS_FILE"
+    echo "SUPERADMIN USERNAME: $SUPERADMIN_USERNAME" >>"$CREDENTIALS_FILE"
+    echo "SUPERADMIN PASSWORD: $SUPERADMIN_PASSWORD" >>"$CREDENTIALS_FILE"
+    echo "" >>"$CREDENTIALS_FILE"
+    echo "SECRET KEY: $PANEL_SECRET_KEY" >>"$CREDENTIALS_FILE"
+
+    # Установка безопасных прав на файл с учетными данными
+    chmod 600 "$CREDENTIALS_FILE"
 
     display_panel_installation_complete_message "$PANEL_SECRET_KEY"
 }
@@ -1393,7 +1692,9 @@ EOF
     
     # Запуск сервиса
     mkdir -p logs
-    docker compose up -d
+    
+    docker compose up -d > /dev/null 2>&1 &
+    start_container "$SELFSTEAL_DIR" "caddy" "Caddy"
     
     # Проверяем, запущен ли сервис
     CADDY_STATUS=$(docker compose ps --services --filter "status=running" | grep -q "caddy" && echo "running" || echo "stopped")
@@ -1403,19 +1704,7 @@ EOF
         echo -e "${LIGHT_GREEN}• Домен: ${BOLD_GREEN}$SELF_STEAL_DOMAIN${NC}"
         echo -e "${LIGHT_GREEN}• Порт: ${BOLD_GREEN}$SELF_STEAL_PORT${NC}"
         echo -e "${LIGHT_GREEN}• Директория: ${BOLD_GREEN}$SELFSTEAL_DIR${NC}"
-        echo -e "\n${LIGHT_GREEN}Для управления сервисом используйте следующие команды:${NC}"
-        echo -e "${ORANGE}   cd $SELFSTEAL_DIR${NC}"
-        echo -e "${ORANGE}   make start   ${NC}- Запуск сервиса и просмотр логов"
-        echo -e "${ORANGE}   make stop    ${NC}- Остановка сервиса"
-        echo -e "${ORANGE}   make restart ${NC}- Перезапуск сервиса"
-        echo -e "${ORANGE}   make logs    ${NC}- Просмотр логов сервиса"
-    else
-        echo -e "${BOLD_RED}⚠ Caddy для сайта-заглушки был установлен, но не запущен автоматически.${NC}"
-        echo -e "${LIGHT_RED}Для запуска сервиса вручную выполните:${NC}"
-        echo -e "${ORANGE}   cd $SELFSTEAL_DIR${NC}"
-        echo -e "${ORANGE}   make start${NC}"
-        echo -e "\n${LIGHT_RED}Если ошибка сохраняется, проверьте логи:${NC}"
-        echo -e "${ORANGE}   make logs${NC}"
+        echo ""
     fi
     
     unset SELF_STEAL_DOMAIN
@@ -1496,37 +1785,17 @@ setup_node() {
     
     setup_selfsteal
 
-    cd $REMNANODE_DIR
-    docker compose up -d && docker compose logs -f > /tmp/node_logs 2>&1 & LOGS_PID=$!
-    sleep 1
-    tail -f /tmp/node_logs & TAIL_PID=$!
-    sleep 5
-    kill $LOGS_PID $TAIL_PID 2>/dev/null
-    wait $LOGS_PID $TAIL_PID 2>/dev/null
-    rm -f /tmp/node_logs
-    
+    start_container "$REMNANODE_DIR" "remnawave/node" "Remnawave Node"
+
+    unset CERTIFICATE
+
     # Проверяем, запущена ли нода
     NODE_STATUS=$(docker compose ps --services --filter "status=running" | grep -q "node" && echo "running" || echo "stopped")
     
-    unset CERTIFICATE
-    
     if [ "$NODE_STATUS" = "running" ]; then
-        echo -e "${BOLD_GREEN}✓ Нода Remnawave успешно установлена и запущена!${NC}"
         echo -e "${LIGHT_GREEN}• Порт ноды: ${BOLD_GREEN}$NODE_PORT${NC}"
         echo -e "${LIGHT_GREEN}• Директория ноды: ${BOLD_GREEN}$REMNANODE_DIR${NC}"
-        echo -e "\n${LIGHT_GREEN}Для управления нодой используйте следующие команды:${NC}"
-        echo -e "${ORANGE}   cd $REMNANODE_DIR${NC}"
-        echo -e "${ORANGE}   make start   ${NC}- Запуск ноды и просмотр логов"
-        echo -e "${ORANGE}   make stop    ${NC}- Остановка ноды"
-        echo -e "${ORANGE}   make restart ${NC}- Перезапуск ноды"
-        echo -e "${ORANGE}   make logs    ${NC}- Просмотр логов ноды"
-    else
-        echo -e "${BOLD_RED}⚠ Нода Remnawave была установлена, но не запущена автоматически.${NC}"
-        echo -e "${LIGHT_RED}Для запуска ноды вручную выполните:${NC}"
-        echo -e "${ORANGE}   cd $REMNANODE_DIR${NC}"
-        echo -e "${ORANGE}   make start${NC}"
-        echo -e "\n${LIGHT_RED}Если ошибка сохраняется, проверьте логи:${NC}"
-        echo -e "${ORANGE}   make logs${NC}"
+        echo ""
     fi
     
     unset NODE_PORT
@@ -1544,6 +1813,7 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 clear
+
 
 
 # Остальные модули установки компонентов
@@ -1567,11 +1837,12 @@ main() {
 
         echo -e "${BOLD_BLUE_MENU}Пожалуйста, выберите компонент для установки:${NC}"
         echo
-        echo -e "  ${GREEN}1. ${NC}Установить панель Remnawave"
-        echo -e "  ${GREEN}2. ${NC}Установить ноду Remnawave"
-        echo -e "  ${GREEN}3. ${NC}Выход"
+        echo -e "  ${GREEN}1. ${NC}Установить панель"
+        echo -e "  ${GREEN}2. ${NC}Установить ноду"
+        echo -e "  ${GREEN}3. ${NC}Перезапустить панель"
+        echo -e "  ${GREEN}4. ${NC}Выход"
         echo
-        echo -ne "${BOLD_BLUE_MENU}Выберите опцию (1-3): ${NC}"
+        echo -ne "${BOLD_BLUE_MENU}Выберите опцию (1-4): ${NC}"
         read choice
 
         case $choice in
@@ -1582,6 +1853,9 @@ main() {
             setup_node
             ;;
         3)
+            restart_panel
+            ;;
+        4)
             echo "Готово."
             break
             ;;

@@ -96,7 +96,9 @@ EOF
     
     # Запуск сервиса
     mkdir -p logs
-    docker compose up -d
+    
+    docker compose up -d > /dev/null 2>&1 &
+    start_container "$SELFSTEAL_DIR" "caddy" "Caddy"
     
     # Проверяем, запущен ли сервис
     CADDY_STATUS=$(docker compose ps --services --filter "status=running" | grep -q "caddy" && echo "running" || echo "stopped")
@@ -106,19 +108,7 @@ EOF
         echo -e "${LIGHT_GREEN}• Домен: ${BOLD_GREEN}$SELF_STEAL_DOMAIN${NC}"
         echo -e "${LIGHT_GREEN}• Порт: ${BOLD_GREEN}$SELF_STEAL_PORT${NC}"
         echo -e "${LIGHT_GREEN}• Директория: ${BOLD_GREEN}$SELFSTEAL_DIR${NC}"
-        echo -e "\n${LIGHT_GREEN}Для управления сервисом используйте следующие команды:${NC}"
-        echo -e "${ORANGE}   cd $SELFSTEAL_DIR${NC}"
-        echo -e "${ORANGE}   make start   ${NC}- Запуск сервиса и просмотр логов"
-        echo -e "${ORANGE}   make stop    ${NC}- Остановка сервиса"
-        echo -e "${ORANGE}   make restart ${NC}- Перезапуск сервиса"
-        echo -e "${ORANGE}   make logs    ${NC}- Просмотр логов сервиса"
-    else
-        echo -e "${BOLD_RED}⚠ Caddy для сайта-заглушки был установлен, но не запущен автоматически.${NC}"
-        echo -e "${LIGHT_RED}Для запуска сервиса вручную выполните:${NC}"
-        echo -e "${ORANGE}   cd $SELFSTEAL_DIR${NC}"
-        echo -e "${ORANGE}   make start${NC}"
-        echo -e "\n${LIGHT_RED}Если ошибка сохраняется, проверьте логи:${NC}"
-        echo -e "${ORANGE}   make logs${NC}"
+        echo ""
     fi
     
     unset SELF_STEAL_DOMAIN

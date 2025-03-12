@@ -37,8 +37,11 @@ display_panel_installation_complete_message() {
     print_empty_line
     print_text_line "Логин администратора: $SUPERADMIN_USERNAME"
     print_text_line "Пароль администратора: $SUPERADMIN_PASSWORD"
-    
+    print_empty_line
     echo -e "\033[1m└${border_line}┘\033[0m"
+
+    echo
+    show_success "Данные сохранены в файле: $CREDENTIALS_FILE"
     echo
     echo -e "${BOLD_BLUE}Директория панели: ${NC}$REMNAWAVE_DIR/panel"
     echo -e "${BOLD_BLUE}Директория Caddy: ${NC}$REMNAWAVE_DIR/caddy"
