@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Remnawave Installer (модульная версия)
-# Собрано: Wed Mar 12 07:58:56 UTC 2025
+# Собрано: Wed Mar 12 10:26:57 UTC 2025
 
 # Включение модуля: common.sh
 
@@ -1546,15 +1546,6 @@ fi
 clear
 
 
-# Остальные модули установки компонентов
-source "$SCRIPT_DIR/modules/selfsteal/selfsteal.sh" || {
-    echo "Ошибка загрузки модуля selfsteal.sh"
-    exit 1
-}
-source "$SCRIPT_DIR/modules/node/node.sh" || {
-    echo "Ошибка загрузки модуля node.sh"
-    exit 1
-}
 
 # ===================================================================================
 #                              ГЛАВНОЕ МЕНЮ
