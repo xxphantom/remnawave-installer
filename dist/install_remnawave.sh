@@ -175,9 +175,12 @@ TRANSLATIONS_EN[telegram_enable_notifications]="Do you want to enable Telegram n
 TRANSLATIONS_EN[telegram_bot_token]="Enter your Telegram bot token: "
 TRANSLATIONS_EN[telegram_enable_user_notifications]="Do you want to enable notifications about user events? (if disabled, only node event notifications will be sent)"
 TRANSLATIONS_EN[telegram_users_chat_id]="Enter the chat ID for user event notifications: "
+TRANSLATIONS_EN[telegram_enable_crm_notifications]="Do you want to enable CRM notifications?"
+TRANSLATIONS_EN[telegram_crm_chat_id]="Enter the chat ID for CRM notifications: "
 TRANSLATIONS_EN[telegram_nodes_chat_id]="Enter the chat ID for node event notifications: "
 TRANSLATIONS_EN[telegram_use_topics]="Do you want to use Telegram topics?"
 TRANSLATIONS_EN[telegram_users_thread_id]="Enter the thread ID for user events: "
+TRANSLATIONS_EN[telegram_crm_thread_id]="Enter the thread ID for CRM notifications: "
 TRANSLATIONS_EN[telegram_nodes_thread_id]="Enter the thread ID for node events: "
 
 TRANSLATIONS_EN[domain_panel_prompt]="Enter Panel domain (will be used on panel server), e.g. panel.example.com"
@@ -618,10 +621,13 @@ TRANSLATIONS_RU[telegram_enable_notifications]="Хотите ли вы вклю�
 TRANSLATIONS_RU[telegram_bot_token]="Введите токен вашего Telegram бота: "
 TRANSLATIONS_RU[telegram_enable_user_notifications]="Хотите ли вы включить уведомления о событиях пользователей? (если отключено, будут отправляться только уведомления о событиях нод)"
 TRANSLATIONS_RU[telegram_users_chat_id]="Введите ID чата для уведомлений о событиях пользователей: "
+TRANSLATIONS_RU[telegram_enable_crm_notifications]="Хотите ли вы включить CRM уведомления?"
+TRANSLATIONS_RU[telegram_crm_chat_id]="Введите ID чата для CRM уведомлений: "
 TRANSLATIONS_RU[telegram_nodes_chat_id]="Введите ID чата для уведомлений о событиях нод: "
 TRANSLATIONS_RU[telegram_use_topics]="Хотите ли вы использовать темы Telegram?"
-TRANSLATIONS_RU[telegram_users_thread_id]="Введите ID темы для событий пользователей: "
-TRANSLATIONS_RU[telegram_nodes_thread_id]="Введите ID темы для событий нод: "
+TRANSLATIONS_RU[telegram_users_thread_id]="Введите ID топика для событий пользователей: "
+TRANSLATIONS_RU[telegram_crm_thread_id]="Введите ID топика для CRM уведомлений: "
+TRANSLATIONS_RU[telegram_nodes_thread_id]="Введите ID топика для событий нод: "
 
 TRANSLATIONS_RU[domain_panel_prompt]="Введите домен панели (будет использоваться на сервере панели), например panel.example.com"
 TRANSLATIONS_RU[domain_subscription_prompt]="Введите домен подписки (будет использоваться на сервере панели), например sub.example.com"
@@ -2640,15 +2646,27 @@ collect_telegram_config() {
             TELEGRAM_NOTIFY_USERS_CHAT_ID=""
         fi
 
+        if prompt_yes_no "$(t telegram_enable_crm_notifications)"; then
+            TELEGRAM_NOTIFY_CRM_CHAT_ID=$(prompt_input "$(t telegram_crm_chat_id)" "$ORANGE")
+        else
+            TELEGRAM_NOTIFY_CRM_CHAT_ID=""
+        fi
+
         if prompt_yes_no "$(t telegram_use_topics)"; then
             if [ -n "$TELEGRAM_NOTIFY_USERS_CHAT_ID" ]; then
                 TELEGRAM_NOTIFY_USERS_THREAD_ID=$(prompt_input "$(t telegram_users_thread_id)" "$ORANGE")
             else
                 TELEGRAM_NOTIFY_USERS_THREAD_ID=""
             fi
+            if [ -n "$TELEGRAM_NOTIFY_CRM_CHAT_ID" ]; then
+                TELEGRAM_NOTIFY_CRM_THREAD_ID=$(prompt_input "$(t telegram_crm_thread_id)" "$ORANGE")
+            else
+                TELEGRAM_NOTIFY_CRM_THREAD_ID=""
+            fi
             TELEGRAM_NOTIFY_NODES_THREAD_ID=$(prompt_input "$(t telegram_nodes_thread_id)" "$ORANGE")
         else
             TELEGRAM_NOTIFY_USERS_THREAD_ID=""
+            TELEGRAM_NOTIFY_CRM_THREAD_ID=""
             TELEGRAM_NOTIFY_NODES_THREAD_ID=""
         fi
     else
@@ -2657,8 +2675,10 @@ collect_telegram_config() {
         TELEGRAM_BOT_TOKEN="change-me"
         TELEGRAM_NOTIFY_USERS_CHAT_ID="change-me"
         TELEGRAM_NOTIFY_NODES_CHAT_ID="change-me"
+        TELEGRAM_NOTIFY_CRM_CHAT_ID="change-me"
         TELEGRAM_NOTIFY_USERS_THREAD_ID=""
         TELEGRAM_NOTIFY_NODES_THREAD_ID=""
+        TELEGRAM_NOTIFY_CRM_THREAD_ID=""
     fi
 }
 
@@ -2734,8 +2754,10 @@ setup_panel_environment() {
         "TELEGRAM_BOT_TOKEN" "$TELEGRAM_BOT_TOKEN" \
         "TELEGRAM_NOTIFY_USERS_CHAT_ID" "$TELEGRAM_NOTIFY_USERS_CHAT_ID" \
         "TELEGRAM_NOTIFY_NODES_CHAT_ID" "$TELEGRAM_NOTIFY_NODES_CHAT_ID" \
+        "TELEGRAM_NOTIFY_CRM_CHAT_ID" "$TELEGRAM_NOTIFY_CRM_CHAT_ID" \
         "TELEGRAM_NOTIFY_USERS_THREAD_ID" "$TELEGRAM_NOTIFY_USERS_THREAD_ID" \
         "TELEGRAM_NOTIFY_NODES_THREAD_ID" "$TELEGRAM_NOTIFY_NODES_THREAD_ID" \
+        "TELEGRAM_NOTIFY_CRM_THREAD_ID" "$TELEGRAM_NOTIFY_CRM_THREAD_ID" \
         "SUB_PUBLIC_DOMAIN" "$SUB_DOMAIN" \
         "DATABASE_URL" "postgresql://$DB_USER:$DB_PASSWORD@remnawave-db:5432/$DB_NAME" \
         "POSTGRES_USER" "$DB_USER" \
@@ -2748,7 +2770,7 @@ setup_panel_docker_compose() {
     cat >>docker-compose.yml <<"EOF"
 services:
   remnawave-db:
-    image: postgres:17
+    image: postgres:17.6
     container_name: 'remnawave-db'
     hostname: remnawave-db
     restart: always
@@ -2787,9 +2809,15 @@ services:
         condition: service_healthy
       remnawave-redis:
         condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -f http://localhost:$${METRICS_PORT}/health || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   remnawave-redis:
-    image: valkey/valkey:8.0.2-alpine
+    image: valkey/valkey:8.1-alpine
     container_name: remnawave-redis
     hostname: remnawave-redis
     restart: always
@@ -3113,7 +3141,7 @@ generate_xray_config() {
         "skipFallback": false
       }
     ],
-    "queryStrategy": "ForceIPv4"
+    "queryStrategy": "UseIPv4"
   },
   "inbounds": [
     {

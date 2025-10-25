@@ -79,9 +79,12 @@ TRANSLATIONS_EN[telegram_enable_notifications]="Do you want to enable Telegram n
 TRANSLATIONS_EN[telegram_bot_token]="Enter your Telegram bot token: "
 TRANSLATIONS_EN[telegram_enable_user_notifications]="Do you want to enable notifications about user events? (if disabled, only node event notifications will be sent)"
 TRANSLATIONS_EN[telegram_users_chat_id]="Enter the chat ID for user event notifications: "
+TRANSLATIONS_EN[telegram_enable_crm_notifications]="Do you want to enable CRM notifications?"
+TRANSLATIONS_EN[telegram_crm_chat_id]="Enter the chat ID for CRM notifications: "
 TRANSLATIONS_EN[telegram_nodes_chat_id]="Enter the chat ID for node event notifications: "
 TRANSLATIONS_EN[telegram_use_topics]="Do you want to use Telegram topics?"
 TRANSLATIONS_EN[telegram_users_thread_id]="Enter the thread ID for user events: "
+TRANSLATIONS_EN[telegram_crm_thread_id]="Enter the thread ID for CRM notifications: "
 TRANSLATIONS_EN[telegram_nodes_thread_id]="Enter the thread ID for node events: "
 
 # Domain configuration

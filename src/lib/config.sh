@@ -64,6 +64,14 @@ collect_telegram_config() {
             TELEGRAM_NOTIFY_USERS_CHAT_ID=""
         fi
 
+        # Ask about CRM notifications (optional)
+        if prompt_yes_no "$(t telegram_enable_crm_notifications)"; then
+            TELEGRAM_NOTIFY_CRM_CHAT_ID=$(prompt_input "$(t telegram_crm_chat_id)" "$ORANGE")
+        else
+            # Leave empty to disable CRM notifications
+            TELEGRAM_NOTIFY_CRM_CHAT_ID=""
+        fi
+
         if prompt_yes_no "$(t telegram_use_topics)"; then
             # Only ask for user thread ID if user notifications are enabled
             if [ -n "$TELEGRAM_NOTIFY_USERS_CHAT_ID" ]; then
@@ -71,10 +79,17 @@ collect_telegram_config() {
             else
                 TELEGRAM_NOTIFY_USERS_THREAD_ID=""
             fi
+            # Only ask for CRM thread ID if CRM notifications are enabled
+            if [ -n "$TELEGRAM_NOTIFY_CRM_CHAT_ID" ]; then
+                TELEGRAM_NOTIFY_CRM_THREAD_ID=$(prompt_input "$(t telegram_crm_thread_id)" "$ORANGE")
+            else
+                TELEGRAM_NOTIFY_CRM_THREAD_ID=""
+            fi
             TELEGRAM_NOTIFY_NODES_THREAD_ID=$(prompt_input "$(t telegram_nodes_thread_id)" "$ORANGE")
         else
             # Initialize thread ID variables as empty when not using topics
             TELEGRAM_NOTIFY_USERS_THREAD_ID=""
+            TELEGRAM_NOTIFY_CRM_THREAD_ID=""
             TELEGRAM_NOTIFY_NODES_THREAD_ID=""
         fi
     else
@@ -83,8 +98,10 @@ collect_telegram_config() {
         TELEGRAM_BOT_TOKEN="change-me"
         TELEGRAM_NOTIFY_USERS_CHAT_ID="change-me"
         TELEGRAM_NOTIFY_NODES_CHAT_ID="change-me"
+        TELEGRAM_NOTIFY_CRM_CHAT_ID="change-me"
         TELEGRAM_NOTIFY_USERS_THREAD_ID=""
         TELEGRAM_NOTIFY_NODES_THREAD_ID=""
+        TELEGRAM_NOTIFY_CRM_THREAD_ID=""
     fi
 }
 
@@ -173,8 +190,10 @@ setup_panel_environment() {
         "TELEGRAM_BOT_TOKEN" "$TELEGRAM_BOT_TOKEN" \
         "TELEGRAM_NOTIFY_USERS_CHAT_ID" "$TELEGRAM_NOTIFY_USERS_CHAT_ID" \
         "TELEGRAM_NOTIFY_NODES_CHAT_ID" "$TELEGRAM_NOTIFY_NODES_CHAT_ID" \
+        "TELEGRAM_NOTIFY_CRM_CHAT_ID" "$TELEGRAM_NOTIFY_CRM_CHAT_ID" \
         "TELEGRAM_NOTIFY_USERS_THREAD_ID" "$TELEGRAM_NOTIFY_USERS_THREAD_ID" \
         "TELEGRAM_NOTIFY_NODES_THREAD_ID" "$TELEGRAM_NOTIFY_NODES_THREAD_ID" \
+        "TELEGRAM_NOTIFY_CRM_THREAD_ID" "$TELEGRAM_NOTIFY_CRM_THREAD_ID" \
         "SUB_PUBLIC_DOMAIN" "$SUB_DOMAIN" \
         "DATABASE_URL" "postgresql://$DB_USER:$DB_PASSWORD@remnawave-db:5432/$DB_NAME" \
         "POSTGRES_USER" "$DB_USER" \
@@ -187,7 +206,7 @@ setup_panel_docker_compose() {
     cat >>docker-compose.yml <<"EOF"
 services:
   remnawave-db:
-    image: postgres:17
+    image: postgres:17.6
     container_name: 'remnawave-db'
     hostname: remnawave-db
     restart: always
@@ -226,9 +245,15 @@ services:
         condition: service_healthy
       remnawave-redis:
         condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -f http://localhost:$${METRICS_PORT}/health || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   remnawave-redis:
-    image: valkey/valkey:8.0.2-alpine
+    image: valkey/valkey:8.1-alpine
     container_name: remnawave-redis
     hostname: remnawave-redis
     restart: always

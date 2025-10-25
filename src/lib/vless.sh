@@ -61,7 +61,7 @@ generate_xray_config() {
         "skipFallback": false
       }
     ],
-    "queryStrategy": "ForceIPv4"
+    "queryStrategy": "UseIPv4"
   },
   "inbounds": [
     {

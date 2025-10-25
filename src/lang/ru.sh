@@ -79,10 +79,13 @@ TRANSLATIONS_RU[telegram_enable_notifications]="Хотите ли вы вклю�
 TRANSLATIONS_RU[telegram_bot_token]="Введите токен вашего Telegram бота: "
 TRANSLATIONS_RU[telegram_enable_user_notifications]="Хотите ли вы включить уведомления о событиях пользователей? (если отключено, будут отправляться только уведомления о событиях нод)"
 TRANSLATIONS_RU[telegram_users_chat_id]="Введите ID чата для уведомлений о событиях пользователей: "
+TRANSLATIONS_RU[telegram_enable_crm_notifications]="Хотите ли вы включить CRM уведомления?"
+TRANSLATIONS_RU[telegram_crm_chat_id]="Введите ID чата для CRM уведомлений: "
 TRANSLATIONS_RU[telegram_nodes_chat_id]="Введите ID чата для уведомлений о событиях нод: "
 TRANSLATIONS_RU[telegram_use_topics]="Хотите ли вы использовать темы Telegram?"
-TRANSLATIONS_RU[telegram_users_thread_id]="Введите ID темы для событий пользователей: "
-TRANSLATIONS_RU[telegram_nodes_thread_id]="Введите ID темы для событий нод: "
+TRANSLATIONS_RU[telegram_users_thread_id]="Введите ID топика для событий пользователей: "
+TRANSLATIONS_RU[telegram_crm_thread_id]="Введите ID топика для CRM уведомлений: "
+TRANSLATIONS_RU[telegram_nodes_thread_id]="Введите ID топика для событий нод: "
 
 # Domain configuration
 TRANSLATIONS_RU[domain_panel_prompt]="Введите домен панели (будет использоваться на сервере панели), например panel.example.com"
