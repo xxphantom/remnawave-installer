@@ -255,7 +255,7 @@ services:
         hard: 1048576
     ports:
       - '127.0.0.1:3000:3000'
-      - '127.0.0.1:3001:$${METRICS_PORT:-3001}'
+      - '127.0.0.1:3001:3001'
     env_file:
       - .env
     volumes:
@@ -268,7 +268,7 @@ services:
       remnawave-redis:
         condition: service_healthy
     healthcheck:
-      test: ['CMD-SHELL', 'curl -f http://localhost:$${METRICS_PORT:-3001}/health']
+      test: ['CMD-SHELL', 'curl -f http://localhost:3001/health']
       interval: 30s
       timeout: 5s
       retries: 3
