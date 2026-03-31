@@ -50,6 +50,12 @@ services:
         image: remnawave/node:latest
         network_mode: host
         restart: always
+        cap_add:
+            - NET_ADMIN
+        ulimits:
+            nofile:
+                soft: 1048576
+                hard: 1048576
         environment:
             - NODE_PORT=$NODE_PORT
             - SECRET_KEY="$certificate"

@@ -48,60 +48,80 @@ update_file() {
     mv "$temp_file" "$env_file"
 }
 
+# Build telegram notify value in "chat_id:thread_id" format
+# If thread_id is empty, returns just chat_id
+build_telegram_notify_value() {
+    local chat_id="$1"
+    local thread_id="$2"
+
+    if [ -n "$thread_id" ]; then
+        echo "${chat_id}:${thread_id}"
+    else
+        echo "$chat_id"
+    fi
+}
+
+# Collect chat_id and optional thread_id for a telegram notification channel
+collect_telegram_channel() {
+    local chat_id_prompt="$1"
+    local chat_id
+    local thread_id
+
+    chat_id=$(prompt_input "$chat_id_prompt" "$ORANGE")
+
+    if prompt_yes_no "$(t telegram_use_topics)"; then
+        thread_id=$(prompt_input "$(t telegram_thread_id)" "$ORANGE")
+    else
+        thread_id=""
+    fi
+
+    build_telegram_notify_value "$chat_id" "$thread_id"
+}
+
 # Collect Telegram configuration
 collect_telegram_config() {
     if prompt_yes_no "$(t telegram_enable_notifications)"; then
         IS_TELEGRAM_NOTIFICATIONS_ENABLED=true
         TELEGRAM_BOT_TOKEN=$(prompt_input "$(t telegram_bot_token)" "$ORANGE")
 
-        TELEGRAM_NOTIFY_NODES_CHAT_ID=$(prompt_input "$(t telegram_nodes_chat_id)" "$ORANGE")
+        TELEGRAM_NOTIFY_NODES=$(collect_telegram_channel "$(t telegram_nodes_chat_id)")
 
-        # Ask about user notifications (optional since 1.6.7)
+        # Ask about user notifications (optional)
         if prompt_yes_no "$(t telegram_enable_user_notifications)"; then
-            TELEGRAM_NOTIFY_USERS_CHAT_ID=$(prompt_input "$(t telegram_users_chat_id)" "$ORANGE")
+            TELEGRAM_NOTIFY_USERS=$(collect_telegram_channel "$(t telegram_users_chat_id)")
         else
-            # Leave empty to disable user notifications
-            TELEGRAM_NOTIFY_USERS_CHAT_ID=""
+            TELEGRAM_NOTIFY_USERS=""
         fi
 
         # Ask about CRM notifications (optional)
         if prompt_yes_no "$(t telegram_enable_crm_notifications)"; then
-            TELEGRAM_NOTIFY_CRM_CHAT_ID=$(prompt_input "$(t telegram_crm_chat_id)" "$ORANGE")
+            TELEGRAM_NOTIFY_CRM=$(collect_telegram_channel "$(t telegram_crm_chat_id)")
         else
-            # Leave empty to disable CRM notifications
-            TELEGRAM_NOTIFY_CRM_CHAT_ID=""
+            TELEGRAM_NOTIFY_CRM=""
         fi
 
-        if prompt_yes_no "$(t telegram_use_topics)"; then
-            # Only ask for user thread ID if user notifications are enabled
-            if [ -n "$TELEGRAM_NOTIFY_USERS_CHAT_ID" ]; then
-                TELEGRAM_NOTIFY_USERS_THREAD_ID=$(prompt_input "$(t telegram_users_thread_id)" "$ORANGE")
-            else
-                TELEGRAM_NOTIFY_USERS_THREAD_ID=""
-            fi
-            # Only ask for CRM thread ID if CRM notifications are enabled
-            if [ -n "$TELEGRAM_NOTIFY_CRM_CHAT_ID" ]; then
-                TELEGRAM_NOTIFY_CRM_THREAD_ID=$(prompt_input "$(t telegram_crm_thread_id)" "$ORANGE")
-            else
-                TELEGRAM_NOTIFY_CRM_THREAD_ID=""
-            fi
-            TELEGRAM_NOTIFY_NODES_THREAD_ID=$(prompt_input "$(t telegram_nodes_thread_id)" "$ORANGE")
+        # Ask about service notifications (optional)
+        if prompt_yes_no "$(t telegram_enable_service_notifications)"; then
+            TELEGRAM_NOTIFY_SERVICE=$(collect_telegram_channel "$(t telegram_service_chat_id)")
         else
-            # Initialize thread ID variables as empty when not using topics
-            TELEGRAM_NOTIFY_USERS_THREAD_ID=""
-            TELEGRAM_NOTIFY_CRM_THREAD_ID=""
-            TELEGRAM_NOTIFY_NODES_THREAD_ID=""
+            TELEGRAM_NOTIFY_SERVICE=""
+        fi
+
+        # Ask about TBLOCKER notifications (optional)
+        if prompt_yes_no "$(t telegram_enable_tblocker_notifications)"; then
+            TELEGRAM_NOTIFY_TBLOCKER=$(collect_telegram_channel "$(t telegram_tblocker_chat_id)")
+        else
+            TELEGRAM_NOTIFY_TBLOCKER=""
         fi
     else
         show_warning "$(t warning_skipping_telegram)"
         IS_TELEGRAM_NOTIFICATIONS_ENABLED=false
-        TELEGRAM_BOT_TOKEN="change-me"
-        TELEGRAM_NOTIFY_USERS_CHAT_ID="change-me"
-        TELEGRAM_NOTIFY_NODES_CHAT_ID="change-me"
-        TELEGRAM_NOTIFY_CRM_CHAT_ID="change-me"
-        TELEGRAM_NOTIFY_USERS_THREAD_ID=""
-        TELEGRAM_NOTIFY_NODES_THREAD_ID=""
-        TELEGRAM_NOTIFY_CRM_THREAD_ID=""
+        TELEGRAM_BOT_TOKEN=""
+        TELEGRAM_NOTIFY_NODES=""
+        TELEGRAM_NOTIFY_USERS=""
+        TELEGRAM_NOTIFY_CRM=""
+        TELEGRAM_NOTIFY_SERVICE=""
+        TELEGRAM_NOTIFY_TBLOCKER=""
     fi
 }
 
@@ -174,18 +194,18 @@ setup_panel_environment() {
         "JWT_API_TOKENS_SECRET" "$JWT_API_TOKENS_SECRET" \
         "IS_TELEGRAM_NOTIFICATIONS_ENABLED" "$IS_TELEGRAM_NOTIFICATIONS_ENABLED" \
         "TELEGRAM_BOT_TOKEN" "$TELEGRAM_BOT_TOKEN" \
-        "TELEGRAM_NOTIFY_USERS_CHAT_ID" "$TELEGRAM_NOTIFY_USERS_CHAT_ID" \
-        "TELEGRAM_NOTIFY_NODES_CHAT_ID" "$TELEGRAM_NOTIFY_NODES_CHAT_ID" \
-        "TELEGRAM_NOTIFY_CRM_CHAT_ID" "$TELEGRAM_NOTIFY_CRM_CHAT_ID" \
-        "TELEGRAM_NOTIFY_USERS_THREAD_ID" "$TELEGRAM_NOTIFY_USERS_THREAD_ID" \
-        "TELEGRAM_NOTIFY_NODES_THREAD_ID" "$TELEGRAM_NOTIFY_NODES_THREAD_ID" \
-        "TELEGRAM_NOTIFY_CRM_THREAD_ID" "$TELEGRAM_NOTIFY_CRM_THREAD_ID" \
+        "TELEGRAM_NOTIFY_NODES" "$TELEGRAM_NOTIFY_NODES" \
+        "TELEGRAM_NOTIFY_USERS" "$TELEGRAM_NOTIFY_USERS" \
+        "TELEGRAM_NOTIFY_CRM" "$TELEGRAM_NOTIFY_CRM" \
+        "TELEGRAM_NOTIFY_SERVICE" "$TELEGRAM_NOTIFY_SERVICE" \
+        "TELEGRAM_NOTIFY_TBLOCKER" "$TELEGRAM_NOTIFY_TBLOCKER" \
         "SUB_PUBLIC_DOMAIN" "$SUB_DOMAIN" \
         "DATABASE_URL" "postgresql://$DB_USER:$DB_PASSWORD@remnawave-db:5432/$DB_NAME" \
         "POSTGRES_USER" "$DB_USER" \
         "POSTGRES_PASSWORD" "$DB_PASSWORD" \
         "POSTGRES_DB" "$DB_NAME" \
-        "METRICS_PASS" "$METRICS_PASS"
+        "METRICS_PASS" "$METRICS_PASS" \
+        "REDIS_SOCKET" "/var/run/valkey/valkey.sock"
 }
 
 setup_panel_docker_compose() {
@@ -196,6 +216,10 @@ services:
     container_name: 'remnawave-db'
     hostname: remnawave-db
     restart: always
+    ulimits:
+      nofile:
+        soft: 1048576
+        hard: 1048576
     env_file:
       - .env
     environment:
@@ -225,10 +249,17 @@ services:
     container_name: 'remnawave'
     hostname: remnawave
     restart: always
+    ulimits:
+      nofile:
+        soft: 1048576
+        hard: 1048576
     ports:
       - '127.0.0.1:3000:3000'
+      - '127.0.0.1:3001:$${METRICS_PORT:-3001}'
     env_file:
       - .env
+    volumes:
+      - valkey-socket:/var/run/valkey
     networks:
       - remnawave-network
     depends_on:
@@ -249,18 +280,31 @@ services:
         max-file: '5'
 
   remnawave-redis:
-    image: valkey/valkey:8.1-alpine
+    image: valkey/valkey:9-alpine
     container_name: remnawave-redis
     hostname: remnawave-redis
     restart: always
+    ulimits:
+      nofile:
+        soft: 1048576
+        hard: 1048576
     networks:
       - remnawave-network
     volumes:
-      - remnawave-redis-data:/data
+      - valkey-socket:/var/run/valkey
+    command: >
+      valkey-server
+      --save ""
+      --appendonly no
+      --maxmemory-policy noeviction
+      --loglevel warning
+      --unixsocket /var/run/valkey/valkey.sock
+      --unixsocketperm 777
+      --port 0
     healthcheck:
-      test: [ "CMD", "valkey-cli", "ping" ]
+      test: ['CMD', 'valkey-cli', '-s', '/var/run/valkey/valkey.sock', 'ping']
       interval: 3s
-      timeout: 10s
+      timeout: 3s
       retries: 3
     logging:
       driver: 'json-file'
@@ -282,10 +326,10 @@ volumes:
     driver: local
     external: false
     name: remnawave-db-data
-  remnawave-redis-data:
+  valkey-socket:
+    name: valkey-socket
     driver: local
     external: false
-    name: remnawave-redis-data
 EOF
 
     # Replace Docker image tag placeholder with actual value
