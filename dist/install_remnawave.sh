@@ -155,9 +155,9 @@ TRANSLATIONS_EN[install_menu_back]="Back to main menu"
 
 TRANSLATIONS_EN[update_menu_title]="Update Panel/Node"
 TRANSLATIONS_EN[update_menu_panel_only]="Panel Only:"
-TRANSLATIONS_EN[update_menu_panel_update]="Update Panel"
+TRANSLATIONS_EN[update_menu_panel_update]="Update Panel (also updates node if on the same server)"
 TRANSLATIONS_EN[update_menu_node_only]="Node Only:"
-TRANSLATIONS_EN[update_menu_node_separate]="Update Node (separate server)"
+TRANSLATIONS_EN[update_menu_node_separate]="Update Node (separate server or All-in-One)"
 TRANSLATIONS_EN[update_menu_back]="Back to main menu"
 
 TRANSLATIONS_EN[prompt_yes_no_suffix]=" (y/n): "
@@ -633,7 +633,7 @@ TRANSLATIONS_RU[update_menu_title]="Обновление панели/ноды"
 TRANSLATIONS_RU[update_menu_panel_only]="Только панель:"
 TRANSLATIONS_RU[update_menu_panel_update]="Обновить панель (также обновит ноду, если на том же сервере)"
 TRANSLATIONS_RU[update_menu_node_only]="Только нода:"
-TRANSLATIONS_RU[update_menu_node_separate]="Обновить ноду (для отдельного сервера)"
+TRANSLATIONS_RU[update_menu_node_separate]="Обновить ноду (отдельный сервер или All-in-One)"
 TRANSLATIONS_RU[update_menu_back]="Назад в главное меню"
 
 TRANSLATIONS_RU[prompt_yes_no_suffix]=" (y/n): "
@@ -4299,14 +4299,16 @@ manage_panel_access() {
 
 check_images_updated() {
     local compose_dir="$1"
-    local result_var="$2"
 
-    cd "$compose_dir"
+    cd "$compose_dir" || {
+        echo "error"
+        return
+    }
 
     # Get list of images from compose file
     local images_list=$(docker compose config --images 2>/dev/null)
     if [ -z "$images_list" ]; then
-        eval "$result_var=error"
+        echo "error"
         return
     fi
 
@@ -4324,9 +4326,9 @@ check_images_updated() {
     done <<< "$images_list"
 
     if [ "$updates_found" = true ]; then
-        eval "$result_var=updated"
+        echo "updated"
     else
-        eval "$result_var=no_updates"
+        echo "no_updates"
     fi
 }
 
@@ -4413,19 +4415,15 @@ update_panel_only() {
     local node_updated=false
     local any_updates=false
 
-    # Check for updates and track what needs restart
-    local panel_updated=false
-    local subscription_updated=false
-    local node_updated=false
-    local any_updates=false
-
     # Check panel updates
     show_info "$(t update_checking_images)" "$ORANGE"
-    local panel_result=""
-    check_images_updated "/opt/remnawave" panel_result &
+    local result_file=$(mktemp)
+    check_images_updated "/opt/remnawave" >"$result_file" &
     local check_pid=$!
     spinner $check_pid "$(t update_checking_images)"
     wait $check_pid
+    local panel_result=$(<"$result_file")
+    rm -f "$result_file"
 
     if [ "$panel_result" = "updated" ]; then
         panel_updated=true
@@ -4439,11 +4437,13 @@ update_panel_only() {
 
     # Check subscription page updates if exists
     if [ "$SUBSCRIPTION_PAGE_EXISTS" = true ]; then
-        local subscription_result=""
-        check_images_updated "$sub_page_dir" subscription_result &
+        result_file=$(mktemp)
+        check_images_updated "$sub_page_dir" >"$result_file" &
         local check_pid=$!
         spinner $check_pid "$(t update_checking_images)"
         wait $check_pid
+        local subscription_result=$(<"$result_file")
+        rm -f "$result_file"
 
         if [ "$subscription_result" = "updated" ]; then
             subscription_updated=true
@@ -4458,11 +4458,13 @@ update_panel_only() {
 
     # Check node updates if exists on same server
     if [ "$NODE_EXISTS" = true ]; then
-        local node_result=""
-        check_images_updated "$node_dir" node_result &
+        result_file=$(mktemp)
+        check_images_updated "$node_dir" >"$result_file" &
         local check_pid=$!
         spinner $check_pid "$(t update_checking_images)"
         wait $check_pid
+        local node_result=$(<"$result_file")
+        rm -f "$result_file"
 
         if [ "$node_result" = "updated" ]; then
             node_updated=true
@@ -4574,11 +4576,13 @@ update_node_only() {
 
     # Check for updates
     show_info "$(t update_checking_images)" "$ORANGE"
-    local node_result=""
-    check_images_updated "$node_dir" node_result &
+    local result_file=$(mktemp)
+    check_images_updated "$node_dir" >"$result_file" &
     local check_pid=$!
     spinner $check_pid "$(t update_checking_images)"
     wait $check_pid
+    local node_result=$(<"$result_file")
+    rm -f "$result_file"
 
     if [ "$node_result" = "updated" ]; then
         show_info "$(t update_images_updated)"

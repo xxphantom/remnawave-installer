@@ -5,16 +5,21 @@
 # ===================================================================================
 
 # Check if Docker images were actually updated
+# Prints the result to stdout: "updated", "no_updates" or "error".
+# Callers run it in the background, so the result must go through
+# stdout (a variable assigned via eval would be lost in the subshell).
 check_images_updated() {
     local compose_dir="$1"
-    local result_var="$2"
 
-    cd "$compose_dir"
+    cd "$compose_dir" || {
+        echo "error"
+        return
+    }
 
     # Get list of images from compose file
     local images_list=$(docker compose config --images 2>/dev/null)
     if [ -z "$images_list" ]; then
-        eval "$result_var=error"
+        echo "error"
         return
     fi
 
@@ -32,9 +37,9 @@ check_images_updated() {
     done <<< "$images_list"
 
     if [ "$updates_found" = true ]; then
-        eval "$result_var=updated"
+        echo "updated"
     else
-        eval "$result_var=no_updates"
+        echo "no_updates"
     fi
 }
 
@@ -123,19 +128,15 @@ update_panel_only() {
     local node_updated=false
     local any_updates=false
 
-    # Check for updates and track what needs restart
-    local panel_updated=false
-    local subscription_updated=false
-    local node_updated=false
-    local any_updates=false
-
     # Check panel updates
     show_info "$(t update_checking_images)" "$ORANGE"
-    local panel_result=""
-    check_images_updated "/opt/remnawave" panel_result &
+    local result_file=$(mktemp)
+    check_images_updated "/opt/remnawave" >"$result_file" &
     local check_pid=$!
     spinner $check_pid "$(t update_checking_images)"
     wait $check_pid
+    local panel_result=$(<"$result_file")
+    rm -f "$result_file"
 
     if [ "$panel_result" = "updated" ]; then
         panel_updated=true
@@ -149,11 +150,13 @@ update_panel_only() {
 
     # Check subscription page updates if exists
     if [ "$SUBSCRIPTION_PAGE_EXISTS" = true ]; then
-        local subscription_result=""
-        check_images_updated "$sub_page_dir" subscription_result &
+        result_file=$(mktemp)
+        check_images_updated "$sub_page_dir" >"$result_file" &
         local check_pid=$!
         spinner $check_pid "$(t update_checking_images)"
         wait $check_pid
+        local subscription_result=$(<"$result_file")
+        rm -f "$result_file"
 
         if [ "$subscription_result" = "updated" ]; then
             subscription_updated=true
@@ -168,11 +171,13 @@ update_panel_only() {
 
     # Check node updates if exists on same server
     if [ "$NODE_EXISTS" = true ]; then
-        local node_result=""
-        check_images_updated "$node_dir" node_result &
+        result_file=$(mktemp)
+        check_images_updated "$node_dir" >"$result_file" &
         local check_pid=$!
         spinner $check_pid "$(t update_checking_images)"
         wait $check_pid
+        local node_result=$(<"$result_file")
+        rm -f "$result_file"
 
         if [ "$node_result" = "updated" ]; then
             node_updated=true
@@ -285,11 +290,13 @@ update_node_only() {
 
     # Check for updates
     show_info "$(t update_checking_images)" "$ORANGE"
-    local node_result=""
-    check_images_updated "$node_dir" node_result &
+    local result_file=$(mktemp)
+    check_images_updated "$node_dir" >"$result_file" &
     local check_pid=$!
     spinner $check_pid "$(t update_checking_images)"
     wait $check_pid
+    local node_result=$(<"$result_file")
+    rm -f "$result_file"
 
     if [ "$node_result" = "updated" ]; then
         show_info "$(t update_images_updated)"

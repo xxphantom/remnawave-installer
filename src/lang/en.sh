@@ -44,9 +44,9 @@ TRANSLATIONS_EN[install_menu_back]="Back to main menu"
 # Update menu
 TRANSLATIONS_EN[update_menu_title]="Update Panel/Node"
 TRANSLATIONS_EN[update_menu_panel_only]="Panel Only:"
-TRANSLATIONS_EN[update_menu_panel_update]="Update Panel"
+TRANSLATIONS_EN[update_menu_panel_update]="Update Panel (also updates node if on the same server)"
 TRANSLATIONS_EN[update_menu_node_only]="Node Only:"
-TRANSLATIONS_EN[update_menu_node_separate]="Update Node (separate server)"
+TRANSLATIONS_EN[update_menu_node_separate]="Update Node (separate server or All-in-One)"
 TRANSLATIONS_EN[update_menu_back]="Back to main menu"
 
 # Common prompts

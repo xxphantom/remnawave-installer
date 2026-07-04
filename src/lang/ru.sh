@@ -46,7 +46,7 @@ TRANSLATIONS_RU[update_menu_title]="Обновление панели/ноды"
 TRANSLATIONS_RU[update_menu_panel_only]="Только панель:"
 TRANSLATIONS_RU[update_menu_panel_update]="Обновить панель (также обновит ноду, если на том же сервере)"
 TRANSLATIONS_RU[update_menu_node_only]="Только нода:"
-TRANSLATIONS_RU[update_menu_node_separate]="Обновить ноду (для отдельного сервера)"
+TRANSLATIONS_RU[update_menu_node_separate]="Обновить ноду (отдельный сервер или All-in-One)"
 TRANSLATIONS_RU[update_menu_back]="Назад в главное меню"
 
 # Common prompts
