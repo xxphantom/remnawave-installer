@@ -222,7 +222,9 @@ EOF
 prepare_installation() {
     local extra_deps=("$@")
     clear_screen
-    install_dependencies "${extra_deps[@]}"
+    if ! install_dependencies "${extra_deps[@]}"; then
+        return 1
+    fi
 
     if ! remove_previous_installation; then
         show_info "$(t system_installation_cancelled)"
@@ -238,7 +240,9 @@ prepare_installation() {
 prepare_node_installation() {
     local extra_deps=("$@")
     clear_screen
-    install_dependencies "${extra_deps[@]}"
+    if ! install_dependencies "${extra_deps[@]}"; then
+        return 1
+    fi
 
     if ! remove_previous_installation; then
         show_info "$(t system_installation_cancelled)"
