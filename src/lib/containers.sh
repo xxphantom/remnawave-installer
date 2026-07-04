@@ -15,6 +15,18 @@ get_subscription_page_dir() {
     fi
 }
 
+# Resolve the node directory: node-only installs use /opt/remnanode,
+# all-in-one keeps the node in /opt/remnawave/node
+get_node_dir() {
+    if [ -f "$REMNANODE_DIR/docker-compose.yml" ]; then
+        echo "$REMNANODE_DIR"
+    elif [ -f "$LOCAL_REMNANODE_DIR/docker-compose.yml" ]; then
+        echo "$LOCAL_REMNANODE_DIR"
+    else
+        echo "$REMNANODE_DIR"
+    fi
+}
+
 # Wait for Caddy socket to be ready
 wait_for_caddy_socket() {
     local max_wait=${1:-30}

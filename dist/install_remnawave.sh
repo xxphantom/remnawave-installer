@@ -1272,6 +1272,16 @@ get_subscription_page_dir() {
     fi
 }
 
+get_node_dir() {
+    if [ -f "$REMNANODE_DIR/docker-compose.yml" ]; then
+        echo "$REMNANODE_DIR"
+    elif [ -f "$LOCAL_REMNANODE_DIR/docker-compose.yml" ]; then
+        echo "$LOCAL_REMNANODE_DIR"
+    else
+        echo "$REMNANODE_DIR"
+    fi
+}
+
 wait_for_caddy_socket() {
     local max_wait=${1:-30}
     local elapsed=0
@@ -4371,9 +4381,10 @@ update_panel_only() {
         return 0
     fi
 
-    # Check if node exists on same server to determine warning type
+    # Check if node exists on same server (node-only or all-in-one path)
+    local node_dir=$(get_node_dir)
     NODE_EXISTS=false
-    if [ -d /opt/remnanode ] && [ -f /opt/remnanode/docker-compose.yml ]; then
+    if [ -f "$node_dir/docker-compose.yml" ]; then
         NODE_EXISTS=true
     fi
 
@@ -4447,7 +4458,7 @@ update_panel_only() {
     # Check node updates if exists on same server
     if [ "$NODE_EXISTS" = true ]; then
         local node_result=""
-        check_images_updated "/opt/remnanode" node_result &
+        check_images_updated "$node_dir" node_result &
         local check_pid=$!
         spinner $check_pid "$(t update_checking_images)"
         wait $check_pid
@@ -4504,7 +4515,7 @@ update_panel_only() {
 
     # Recreate node if it was updated
     if [ "$NODE_EXISTS" = true ] && [ "$node_updated" = true ]; then
-        cd /opt/remnanode && docker compose up -d --remove-orphans --force-recreate >/dev/null 2>&1 &
+        cd "$node_dir" && docker compose up -d --remove-orphans --force-recreate >/dev/null 2>&1 &
         spinner $! "$(t update_starting_services)"
         if [ $? -ne 0 ]; then
             show_error "Failed to recreate node services"
@@ -4535,8 +4546,10 @@ update_panel_only() {
 update_node_only() {
     echo
 
+    local node_dir=$(get_node_dir)
+
     # Check if node directory exists
-    if [ ! -d /opt/remnanode ]; then
+    if [ ! -d "$node_dir" ]; then
         show_error "$(t update_node_dir_not_found)"
         show_error "$(t update_install_first)"
         echo -e "${BOLD_YELLOW}$(t prompt_enter_to_return)${NC}"
@@ -4545,7 +4558,7 @@ update_node_only() {
     fi
 
     # Check for docker-compose.yml in node directory
-    if [ ! -f /opt/remnanode/docker-compose.yml ]; then
+    if [ ! -f "$node_dir/docker-compose.yml" ]; then
         show_error "$(t update_compose_not_found)"
         show_error "$(t update_installation_corrupted)"
         echo -e "${BOLD_YELLOW}$(t prompt_enter_to_return)${NC}"
@@ -4561,7 +4574,7 @@ update_node_only() {
     # Check for updates
     show_info "$(t update_checking_images)" "$ORANGE"
     local node_result=""
-    check_images_updated "/opt/remnanode" node_result &
+    check_images_updated "$node_dir" node_result &
     local check_pid=$!
     spinner $check_pid "$(t update_checking_images)"
     wait $check_pid
@@ -4583,7 +4596,7 @@ update_node_only() {
 
     # Recreate services with new images
     show_info "$(t update_starting_services)" "$ORANGE"
-    cd /opt/remnanode && docker compose up -d --remove-orphans --force-recreate >/dev/null 2>&1 &
+    cd "$node_dir" && docker compose up -d --remove-orphans --force-recreate >/dev/null 2>&1 &
     spinner $! "$(t update_starting_services)"
     if [ $? -ne 0 ]; then
         show_error "Failed to recreate node services"
