@@ -28,6 +28,12 @@ update_file() {
     # Create a temporary file
     local temp_file=$(mktemp)
 
+    # Track which keys were found so missing ones are not silently dropped
+    local found=()
+    for i in "${!keys[@]}"; do
+        found[$i]=false
+    done
+
     # Process file line by line and replace needed lines
     while IFS= read -r line || [[ -n "$line" ]]; do
         local key_found=false
@@ -35,6 +41,7 @@ update_file() {
             if [[ "$line" =~ ^${keys[$i]}= ]]; then
                 echo "${keys[$i]}=${values[$i]}" >>"$temp_file"
                 key_found=true
+                found[$i]=true
                 break
             fi
         done
@@ -43,6 +50,13 @@ update_file() {
             echo "$line" >>"$temp_file"
         fi
     done <"$env_file"
+
+    # Append keys that were absent from the template
+    for i in "${!keys[@]}"; do
+        if [ "${found[$i]}" = false ]; then
+            echo "${keys[$i]}=${values[$i]}" >>"$temp_file"
+        fi
+    done
 
     # Replace original file
     mv "$temp_file" "$env_file"

@@ -2716,12 +2716,18 @@ update_file() {
 
     local temp_file=$(mktemp)
 
+    local found=()
+    for i in "${!keys[@]}"; do
+        found[$i]=false
+    done
+
     while IFS= read -r line || [[ -n "$line" ]]; do
         local key_found=false
         for i in "${!keys[@]}"; do
             if [[ "$line" =~ ^${keys[$i]}= ]]; then
                 echo "${keys[$i]}=${values[$i]}" >>"$temp_file"
                 key_found=true
+                found[$i]=true
                 break
             fi
         done
@@ -2730,6 +2736,12 @@ update_file() {
             echo "$line" >>"$temp_file"
         fi
     done <"$env_file"
+
+    for i in "${!keys[@]}"; do
+        if [ "${found[$i]}" = false ]; then
+            echo "${keys[$i]}=${values[$i]}" >>"$temp_file"
+        fi
+    done
 
     mv "$temp_file" "$env_file"
 }
@@ -5360,7 +5372,6 @@ services:
       - ./logs:/var/log/caddy
       - remnawave-caddy-ssl-data:/data
     environment:
-      - SELF_STEAL_DOMAIN=$SELF_STEAL_DOMAIN
       - PANEL_DOMAIN=$PANEL_DOMAIN
       - SUB_DOMAIN=$SUB_DOMAIN
       - BACKEND_URL=$BACKEND_URL
@@ -5383,12 +5394,6 @@ EOF
     cat >Caddyfile <<"EOF"
 {
     admin   off
-}
-
-https://{$SELF_STEAL_DOMAIN} {
-    root * /var/www/html
-    try_files {path} /index.html
-    file_server
 }
 
 https://{$PANEL_DOMAIN} {
@@ -5570,7 +5575,6 @@ services:
             - AUTHP_ADMIN_USER=$AUTHP_ADMIN_USER
             - AUTHP_ADMIN_EMAIL=$AUTHP_ADMIN_EMAIL
             - AUTHP_ADMIN_SECRET=$AUTHP_ADMIN_SECRET
-            - CADDY_SELF_STEAL_DOMAIN=$SELF_STEAL_DOMAIN
             - CADDY_SUB_DOMAIN=$SUB_DOMAIN
         volumes:
             - ./Caddyfile:/etc/caddy/Caddyfile
@@ -5947,7 +5951,7 @@ services:
     remnanode:
         container_name: remnanode
         hostname: remnanode
-        image: remnawave/node:latest
+        image: remnawave/node:$REMNAWAVE_NODE_TAG
         network_mode: host
         restart: always
         cap_add:
@@ -5958,7 +5962,7 @@ services:
                 hard: 1048576
         environment:
             - NODE_PORT=$NODE_PORT
-            - SECRET_KEY="$certificate"
+            - SECRET_KEY=$certificate
         volumes:
             - /dev/shm:/dev/shm
         logging:
@@ -6183,7 +6187,7 @@ services:
                 hard: 1048576
         environment:
             - NODE_PORT=$node_port
-            - SECRET_KEY="$pubkey"
+            - SECRET_KEY=$pubkey
         volumes:
             - /dev/shm:/dev/shm
         network_mode: host

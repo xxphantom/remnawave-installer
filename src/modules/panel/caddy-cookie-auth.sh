@@ -17,7 +17,6 @@ services:
       - ./logs:/var/log/caddy
       - remnawave-caddy-ssl-data:/data
     environment:
-      - SELF_STEAL_DOMAIN=$SELF_STEAL_DOMAIN
       - PANEL_DOMAIN=$PANEL_DOMAIN
       - SUB_DOMAIN=$SUB_DOMAIN
       - BACKEND_URL=$BACKEND_URL
@@ -41,12 +40,6 @@ EOF
     cat >Caddyfile <<"EOF"
 {
     admin   off
-}
-
-https://{$SELF_STEAL_DOMAIN} {
-    root * /var/www/html
-    try_files {path} /index.html
-    file_server
 }
 
 https://{$PANEL_DOMAIN} {

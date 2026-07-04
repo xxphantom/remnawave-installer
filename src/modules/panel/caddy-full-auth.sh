@@ -134,7 +134,6 @@ services:
             - AUTHP_ADMIN_USER=$AUTHP_ADMIN_USER
             - AUTHP_ADMIN_EMAIL=$AUTHP_ADMIN_EMAIL
             - AUTHP_ADMIN_SECRET=$AUTHP_ADMIN_SECRET
-            - CADDY_SELF_STEAL_DOMAIN=$SELF_STEAL_DOMAIN
             - CADDY_SUB_DOMAIN=$SUB_DOMAIN
         volumes:
             - ./Caddyfile:/etc/caddy/Caddyfile

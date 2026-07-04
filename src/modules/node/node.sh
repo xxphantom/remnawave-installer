@@ -47,7 +47,7 @@ services:
     remnanode:
         container_name: remnanode
         hostname: remnanode
-        image: remnawave/node:latest
+        image: remnawave/node:$REMNAWAVE_NODE_TAG
         network_mode: host
         restart: always
         cap_add:
@@ -58,7 +58,7 @@ services:
                 hard: 1048576
         environment:
             - NODE_PORT=$NODE_PORT
-            - SECRET_KEY="$certificate"
+            - SECRET_KEY=$certificate
         volumes:
             - /dev/shm:/dev/shm
         logging:

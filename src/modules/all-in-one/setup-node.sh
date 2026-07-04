@@ -34,7 +34,7 @@ services:
                 hard: 1048576
         environment:
             - NODE_PORT=$node_port
-            - SECRET_KEY="$pubkey"
+            - SECRET_KEY=$pubkey
         volumes:
             - /dev/shm:/dev/shm
         network_mode: host
