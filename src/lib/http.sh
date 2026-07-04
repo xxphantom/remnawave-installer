@@ -12,8 +12,8 @@ make_api_request() {
     local data=$5
     local cookie=${6:-""}
 
-    # Extract only the host from the URL (without paths and protocols)
-    local host_only=$(echo "${url#http://}" | cut -d'/' -f1)
+    # Extract only the host from the URL (X-Forwarded-For must not contain a port)
+    local host_only=$(echo "${url#http://}" | cut -d'/' -f1 | cut -d':' -f1)
 
     local headers=(
         -H "Content-Type: application/json"

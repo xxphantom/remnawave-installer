@@ -60,6 +60,7 @@ NC=$(tput sgr0)
 VERSION="2.1.1"
 
 if [[ "$REMNAWAVE_BRANCH" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+    # Use the version number as tag directly
     REMNAWAVE_BACKEND_TAG="$REMNAWAVE_BRANCH"
     REMNAWAVE_NODE_TAG="$REMNAWAVE_BRANCH"
 elif [ "$REMNAWAVE_BRANCH" = "dev" ]; then
@@ -69,6 +70,7 @@ elif [ "$REMNAWAVE_BRANCH" = "alpha" ]; then
     REMNAWAVE_BACKEND_TAG="alpha"
     REMNAWAVE_NODE_TAG="dev"  # Node doesn't have alpha tag, use dev
 else
+    # Default to major version 2 for main branch (stable)
     REMNAWAVE_BACKEND_TAG="2"
     REMNAWAVE_NODE_TAG="latest"
 fi
@@ -95,6 +97,7 @@ t() {
     local key="$1"
     local value=""
 
+    # Get the value from the appropriate language array
     case "$LANG_CODE" in
         "ru")
             value="${TRANSLATIONS_RU[$key]:-}"
@@ -104,6 +107,7 @@ t() {
             ;;
     esac
 
+    # Return the translation or show missing key
     if [ -n "$value" ]; then
         echo "$value"
     else
@@ -1070,6 +1074,7 @@ IFS=$'\n\t'
 install_dependencies() {
     local extra_deps=("$@")
 
+    # --- 1. Определяем дистрибутив ---
     if ! command -v lsb_release &>/dev/null; then
         show_info "Installing lsb-release..."
         sudo apt-get update -qq
@@ -1154,6 +1159,7 @@ install_dependencies() {
         local ssh_port=$(grep -Ei '^\s*Port\s+' /etc/ssh/sshd_config | awk '{print $2}' | head -1)
         ssh_port=${ssh_port:-22}
 
+        # Check if UFW is active and properly configured
         if ufw status | head -1 | grep -q "Status: active" &&
            ufw status | grep -qw "${ssh_port}/tcp" &&
            ufw status | grep -qw "443/tcp" &&
@@ -1257,7 +1263,9 @@ wait_for_caddy_socket() {
 remove_previous_installation() {
     local from_menu=${1:-false}
 
+    # Check if any installation directory exists (panel or node-only)
     if [ -d "$REMNAWAVE_DIR" ] || [ -d "$REMNANODE_DIR" ]; then
+        # Show warning and request confirmation (keep as is)
         if [ "$from_menu" = true ]; then
             show_warning "$(t removal_installation_detected)"
             if [ "$KEEP_CADDY_DATA" = "true" ]; then
@@ -1276,6 +1284,7 @@ remove_previous_installation() {
             fi
         fi
 
+        # Array of compose files to process
         local compose_configs=(
             "$REMNAWAVE_DIR/caddy/docker-compose.yml"
             "$LOCAL_REMNANODE_DIR/docker-compose.yml"
@@ -1287,14 +1296,18 @@ remove_previous_installation() {
             "$REMNANODE_DIR/node/docker-compose.yml"  # Old path - for backward compatibility
         )
 
+        # Process each compose file
         for compose_file in "${compose_configs[@]}"; do
             if [ -f "$compose_file" ]; then
                 local dir_path=$(dirname "$compose_file")
                 local compose_cmd="docker compose down"
                 
+                # Check if this is Caddy and we should keep its data
                 if [[ "$dir_path" == *"/caddy"* ]] && [ "$KEEP_CADDY_DATA" = "true" ]; then
+                    # Don't remove volumes for Caddy
                     compose_cmd="$compose_cmd --rmi local --remove-orphans"
                 else
+                    # Remove volumes for everything else (or for Caddy if not keeping data)
                     compose_cmd="$compose_cmd -v --rmi local --remove-orphans"
                 fi
                 
@@ -1303,6 +1316,7 @@ remove_previous_installation() {
             fi
         done
 
+        # Force cleanup of remaining containers (if any)
         local containers=("remnawave-subscription-page" "remnawave" "remnawave-db" "remnawave-redis" "remnanode" "caddy-remnawave" "caddy-selfsteal")
         for container in "${containers[@]}"; do
             if docker ps -a --format '{{.Names}}' | grep -q "^$container$"; then
@@ -1311,6 +1325,7 @@ remove_previous_installation() {
             fi
         done
 
+        # Remove directories
         if [ -d "$REMNAWAVE_DIR" ]; then
             rm -rf "$REMNAWAVE_DIR" >/dev/null 2>&1 &
             spinner $! "$(t spinner_removing_directory) $REMNAWAVE_DIR"
@@ -1320,6 +1335,7 @@ remove_previous_installation() {
             spinner $! "$(t spinner_removing_directory) $REMNANODE_DIR"
         fi
 
+        # Show result
         if [ "$from_menu" = true ]; then
             show_success "$(t removal_complete_success)"
             read
@@ -1339,33 +1355,41 @@ remove_previous_installation() {
 restart_panel() {
     local no_wait=${1:-false} # Optional parameter to skip waiting for user input
     echo ''
+    # Check for panel directory
     if [ ! -d /opt/remnawave ]; then
         show_error "$(t restart_panel_dir_not_found)"
         show_error "$(t restart_install_panel_first)"
     else
+        # Check for docker-compose.yml in panel directory
         if [ ! -f /opt/remnawave/docker-compose.yml ]; then
             show_error "$(t restart_compose_not_found)"
             show_error "$(t restart_installation_corrupted)"
         else
+            # Variable to track subscription-page directory existence
             SUBSCRIPTION_PAGE_EXISTS=false
 
+            # Check for subscription-page directory
             if [ -d /opt/remnawave/subscription-page ] && [ -f /opt/remnawave/subscription-page/docker-compose.yml ]; then
                 SUBSCRIPTION_PAGE_EXISTS=true
             fi
 
+            # Stop subscription page if it exists
             if [ "$SUBSCRIPTION_PAGE_EXISTS" = true ]; then
                 cd /opt/remnawave/subscription-page && docker compose down >/dev/null 2>&1 &
                 spinner $! "$(t spinner_stopping_subscription)"
             fi
 
+            # Stop panel
             cd /opt/remnawave && docker compose down >/dev/null 2>&1 &
             spinner $! "$(t spinner_restarting_panel)"
 
+            # Start panel with error handling
             show_info "$(t restart_starting_panel)" "$ORANGE"
             if ! start_container "/opt/remnawave" "Remnawave Panel"; then
                 return 1
             fi
 
+            # Start subscription page if it exists
             if [ "$SUBSCRIPTION_PAGE_EXISTS" = true ]; then
                 show_info "$(t restart_starting_subscription)" "$ORANGE"
                 if ! start_container "/opt/remnawave/subscription-page" "Subscription Page"; then
@@ -1516,6 +1540,7 @@ draw_section_header() {
 
     echo -e "${BOLD_RED}\033[1m┌$(printf '─%.0s' $(seq 1 $width))┐\033[0m${NC}"
 
+    # Centring title
     local padding_left=$(((width - ${#title}) / 2))
     local padding_right=$((width - padding_left - ${#title}))
     echo -e "${BOLD_RED}\033[1m│$(printf ' %.0s' $(seq 1 $padding_left))$title$(printf ' %.0s' $(seq 1 $padding_right))│\033[0m${NC}"
@@ -1709,6 +1734,7 @@ prompt_menu_option() {
         read selected_option
         echo >&2
 
+        # Validation of selection
         if [[ "$selected_option" =~ ^[0-9]+$ ]] &&
             [ "$selected_option" -ge "$min" ] &&
             [ "$selected_option" -le "$max" ]; then
@@ -1727,26 +1753,31 @@ validate_password_strength() {
 
     local length=${#password}
 
+    # Check length
     if [ "$length" -lt "$min_length" ]; then
         echo "$(t password_min_length) $min_length $(t password_min_length_suffix)"
         return 1
     fi
 
+    # Check for digits
     if ! [[ "$password" =~ [0-9] ]]; then
         echo "$(t password_need_digit)"
         return 1
     fi
 
+    # Check for lowercase letters
     if ! [[ "$password" =~ [a-z] ]]; then
         echo "$(t password_need_lowercase)"
         return 1
     fi
 
+    # Check for uppercase letters
     if ! [[ "$password" =~ [A-Z] ]]; then
         echo "$(t password_need_uppercase)"
         return 1
     fi
 
+    # Password passed all checks
     return 0
 }
 
@@ -1758,16 +1789,20 @@ prompt_secure_password() {
     local password1 password2 error_message
 
     while true; do
+        # Request password
         password1=$(prompt_password "$prompt_text")
 
+        # Check password strength
         error_message=$(validate_password_strength "$password1" "$min_length")
         if [ $? -ne 0 ]; then
             echo -e "${BOLD_RED}${error_message} $(t password_try_again)${NC}" >&2
             continue
         fi
 
+        # Request password confirmation
         password2=$(prompt_password "$confirm_text")
 
+        # Check password match
         if [ "$password1" = "$password2" ]; then
             break
         else
@@ -1784,11 +1819,13 @@ prompt_secure_password() {
 validate_port() {
     local port="$1"
 
+    # Check if port is a number
     if ! [[ "$port" =~ ^[0-9]+$ ]]; then
         echo -e "${BOLD_RED}$(t network_error_port_number)${NC}" >&2
         return 1
     fi
 
+    # Check port range
     if [ "$port" -lt 1 ] || [ "$port" -gt 65535 ]; then
         echo -e "${BOLD_RED}$(t network_error_port_range)${NC}" >&2
         return 1
@@ -1800,6 +1837,7 @@ validate_port() {
 is_port_available() {
     local port="$1"
 
+    # Check if port is in use
     if ss -tuln | grep -q ":$port "; then
         return 1 # Port is in use
     else
@@ -1828,12 +1866,14 @@ is_ip_in_cidrs() {
     shift
     local cidrs=("$@")
 
+    # Helper function to convert IP (format x.x.x.x) to 32-bit number
     function ip2dec() {
         local a b c d
         IFS=. read -r a b c d <<<"$1"
         echo $(((a << 24) + (b << 16) + (c << 8) + d))
     }
 
+    # Function to check if IP is in CIDR
     function in_cidr() {
         local ip_dec mask base_ip cidr_ip cidr_mask
         ip_dec=$(ip2dec "$1")
@@ -1843,6 +1883,7 @@ is_ip_in_cidrs() {
         cidr_ip=$(ip2dec "$base_ip")
         cidr_mask=$((0xFFFFFFFF << (32 - mask) & 0xFFFFFFFF))
 
+        # Если (ip_dec & cidr_mask) == (cidr_ip & cidr_mask), IP попадает в диапазон
         if (((ip_dec & cidr_mask) == (cidr_ip & cidr_mask))); then
             return 0
         else
@@ -1850,6 +1891,7 @@ is_ip_in_cidrs() {
         fi
     }
 
+    # Check IP against all ranges; if it matches at least one, return 0
     for range in "${cidrs[@]}"; do
         if in_cidr "$ip" "$range"; then
             return 0
@@ -1864,9 +1906,11 @@ prompt_email() {
     local result=""
 
     while true; do
+        # Display prompt
         prompt_formatted_text="${ORANGE}${prompt}: ${NC}"
         read -p "$prompt_formatted_text" result
 
+        # Email validation
         if [[ "$result" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
             break
         else
@@ -1886,13 +1930,16 @@ get_available_port() {
     local default_port="$1"
     local port_name="$2" # For display purposes only
 
+    # Validate the default port
     local port=$(validate_port "$default_port")
 
+    # Check if port is available
     if is_port_available "$port"; then
         show_info "$(t network_using_default_port) $port_name port: $port"
         echo "$port"
         return 0
     else
+        # Find next available port
         show_info "Default $port_name $(t network_port_in_use)"
         local available_port=$(find_available_port "$((port + 1))")
 
@@ -1902,6 +1949,7 @@ get_available_port() {
             return 0
         else
             show_error "$(t network_failed_find_port) $port_name!"
+            # Return the default as fallback
             echo "$default_port"
             return 1
         fi
@@ -1911,6 +1959,7 @@ get_available_port() {
 check_required_port() {
     local required_port="$1"
 
+    # Validate the port
     local port=$(validate_port "$required_port")
 
     if is_port_available "$port"; then
@@ -1934,17 +1983,21 @@ prompt_domain() {
         read domain
         echo >&2
 
+        # Base domain validation
         if ! [[ "$domain" =~ ^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$ ]]; then
             echo -e "${BOLD_RED}$(t network_invalid_domain)${NC}" >&2
             continue
         fi
 
+        # Get domain's IP
         local domain_ip=""
         domain_ip=$(dig +short A "$domain" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
 
+        # Get public IP of the current server
         local server_ip=""
         server_ip=$(curl -s -4 ifconfig.me || curl -s -4 api.ipify.org || curl -s -4 ipinfo.io/ip)
 
+        # If unable to get IPs, warn and ask if user wants to continue
         if [ -z "$domain_ip" ] || [ -z "$server_ip" ]; then
             if [ "$show_warning" = true ]; then
                 show_warning "$(t network_failed_determine_ip)" 2
@@ -1957,18 +2010,25 @@ prompt_domain() {
             fi
         fi
 
+        # Load current Cloudflare ranges
         local cf_ranges
         cf_ranges=$(curl -s https://www.cloudflare.com/ips-v4) || true # if curl fails, variable remains empty
 
+        # If loaded successfully, convert to array
         local cf_array=()
         if [ -n "$cf_ranges" ]; then
+            # Convert received lines to array
             IFS=$'\n' read -r -d '' -a cf_array <<<"$cf_ranges"
         fi
 
+        # Check if domain_ip is in Cloudflare ranges
         if [ ${#cf_array[@]} -gt 0 ] && is_ip_in_cidrs "$domain_ip" "${cf_array[@]}"; then
+            # IP is Cloudflare
             if [ "$allow_cf_proxy" = true ]; then
+                # Proxying allowed — all good
                 break
             else
+                # Proxying not allowed — warn
                 if [ "$show_warning" = true ]; then
                     echo
                     show_warning "$(t network_domain_points_cloudflare) $domain $(t network_points_cloudflare_ip) ($domain_ip)." 2
@@ -1981,7 +2041,9 @@ prompt_domain() {
                 fi
             fi
         else
+            # Check if domain IP matches server IP based on expectation
             if [ "$expect_different_ip" = "true" ]; then
+                # For separate installation, domain should NOT point to current server
                 if [ "$domain_ip" = "$server_ip" ]; then
                     if [ "$show_warning" = true ]; then
                         show_warning "$(t network_domain_points_server) $domain $(t network_points_this_server) ($server_ip)." 2
@@ -1993,12 +2055,14 @@ prompt_domain() {
                         fi
                     fi
                 else
+                    # Domain points to different server - this is expected for separate installation
                     if [ "$show_warning" = true ]; then
                         :
                     fi
                     break
                 fi
             else
+                # Normal case: domain should point to current server
                 if [ "$domain_ip" != "$server_ip" ]; then
                     if [ "$show_warning" = true ]; then
                         show_warning "$(t network_domain_points_different) $domain $(t network_points_different_ip) $domain_ip, $(t network_differs_from_server) ($server_ip)." 2
@@ -2009,6 +2073,7 @@ prompt_domain() {
                         fi
                     fi
                 else
+                    # Domain points to server IP - all good
                     break
                 fi
             fi
@@ -2037,35 +2102,43 @@ generate_secure_password() {
     local number_chars='0123456789'
     local alphanumeric_chars="${uppercase_chars}${lowercase_chars}${number_chars}"
 
+    # Generate the initial password from letters and digits only
     if command -v openssl &>/dev/null; then
         password="$(openssl rand -base64 48 | tr -dc "$alphanumeric_chars" | head -c "$length")"
     else
+        # If openssl is unavailable, fallback to /dev/urandom
         password="$(head -c 100 /dev/urandom | tr -dc "$alphanumeric_chars" | head -c "$length")"
     fi
 
+    # Check for presence of each character type and add missing ones
+    # If no uppercase character, add one
     if ! [[ "$password" =~ [$uppercase_chars] ]]; then
         local position=$((RANDOM % length))
         local one_uppercase="$(echo "$uppercase_chars" | fold -w1 | shuf | head -n1)"
         password="${password:0:$position}${one_uppercase}${password:$((position + 1))}"
     fi
 
+    # If no lowercase character, add one
     if ! [[ "$password" =~ [$lowercase_chars] ]]; then
         local position=$((RANDOM % length))
         local one_lowercase="$(echo "$lowercase_chars" | fold -w1 | shuf | head -n1)"
         password="${password:0:$position}${one_lowercase}${password:$((position + 1))}"
     fi
 
+    # If no digit, add one
     if ! [[ "$password" =~ [$number_chars] ]]; then
         local position=$((RANDOM % length))
         local one_number="$(echo "$number_chars" | fold -w1 | shuf | head -n1)"
         password="${password:0:$position}${one_number}${password:$((position + 1))}"
     fi
 
+    # Add 1 to 3 special characters (depending on password length), but no more than 25% of password length
     local special_count=$((length / 4))
     special_count=$((special_count > 0 ? special_count : 1))
     special_count=$((special_count < 3 ? special_count : 3))
 
     for ((i = 0; i < special_count; i++)); do
+        # Choose a random position, avoiding first and last character
         local position=$((RANDOM % (length - 2) + 1))
         local one_special="$(echo "$special_chars" | fold -w1 | shuf | head -n1)"
         password="${password:0:$position}${one_special}${password:$((position + 1))}"
@@ -2081,16 +2154,20 @@ generate_readable_login() {
     local login=""
     local type="consonant"
 
+    # Start with a consonant (easier to pronounce)
     while [ ${#login} -lt $length ]; do
         if [ "$type" = "consonant" ]; then
+            # Add consonant
             login+=${consonants[$RANDOM % ${#consonants[@]}]}
             type="vowel"
         else
+            # Add vowel
             login+=${vowels[$RANDOM % ${#vowels[@]}]}
             type="consonant"
         fi
     done
 
+    # Add random number at the end (optional)
     local add_number=$((RANDOM % 2))
     if [ $add_number -eq 1 ]; then
         login+=$((RANDOM % 100))
@@ -2127,6 +2204,7 @@ generate_secrets() {
     JWT_AUTH_SECRET=$(openssl rand -hex 32 | tr -d '\n')
     JWT_API_TOKENS_SECRET=$(openssl rand -hex 32 | tr -d '\n')
     DB_USER="remnawave_$(openssl rand -hex 4 | tr -d '\n')"
+    # Hex only: the password is embedded in DATABASE_URL and must stay URI-safe
     DB_PASSWORD=$(openssl rand -hex 24 | tr -d '\n')
     DB_NAME="remnawave_db"
     METRICS_PASS=$(generate_secure_password 16)
@@ -2145,7 +2223,8 @@ make_api_request() {
     local data=$5
     local cookie=${6:-""}
 
-    local host_only=$(echo "${url#http://}" | cut -d'/' -f1)
+    # Extract only the host from the URL (X-Forwarded-For must not contain a port)
+    local host_only=$(echo "${url#http://}" | cut -d'/' -f1 | cut -d':' -f1)
 
     local headers=(
         -H "Content-Type: application/json"
@@ -2243,12 +2322,14 @@ get_public_key() {
         return 1
     fi
 
+    # 2.9.0 renames the response field pubKey -> secretKey; support both
     local pubkey=$(echo "$api_response" | jq -r '.response.secretKey // .response.pubKey // empty')
     if [ -z "$pubkey" ]; then
         echo -e "${BOLD_RED}$(t api_failed_extract_public_key)${NC}"
         return 1
     fi
 
+    # Return public key
     echo "$pubkey"
 }
 
@@ -2344,10 +2425,12 @@ delete_config_profile() {
     delete_response=$(cat "$temp_file")
     rm -f "$temp_file"
     
+    # Check for successful deletion
     if [ -z "$delete_response" ] || echo "$delete_response" | jq -e '.response.isDeleted == true' >/dev/null 2>&1; then
         return 0
     fi
     
+    # Check if response indicates error
     if echo "$delete_response" | jq -e '.error' >/dev/null 2>&1; then
         echo -e "${BOLD_RED}$(t api_failed_delete_profile)${NC}"
         echo
@@ -2387,6 +2470,7 @@ EOF
     fi
     
     if echo "$profile_response" | jq -e '.response.uuid' >/dev/null; then
+        # Return profile UUID and inbound UUID as colon-separated string
         local profile_uuid=$(echo "$profile_response" | jq -r '.response.uuid')
         local inbound_uuid=$(echo "$profile_response" | jq -r '.response.inbounds[0].uuid')
         echo "$profile_uuid:$inbound_uuid"
@@ -2417,6 +2501,7 @@ get_squads() {
         return 1
     fi
     
+    # Return the full response for processing
     echo "$squads_response"
 }
 
@@ -2429,12 +2514,14 @@ update_squad() {
     
     local temp_file=$(mktemp)
     
+    # First get current squad data
     local squad_response=$(get_squads "$panel_url" "$token" "$panel_domain")
     if [ -z "$squad_response" ] || ! echo "$squad_response" | jq -e '.response.internalSquads' >/dev/null; then
         echo -e "${BOLD_RED}$(t api_empty_response_getting_squads)${NC}"
         return 1
     fi
     
+    # Extract existing inbounds for this squad
     local existing_inbounds=$(echo "$squad_response" | jq -r --arg uuid "$squad_uuid" '.response.internalSquads[] | select(.uuid == $uuid) | .inbounds[].uuid')
     if [ -z "$existing_inbounds" ]; then
         existing_inbounds="[]"
@@ -2442,8 +2529,10 @@ update_squad() {
         existing_inbounds=$(echo "$existing_inbounds" | jq -R . | jq -s .)
     fi
     
+    # Create array with existing and new inbound
     local inbounds_array=$(jq -n --argjson existing "$existing_inbounds" --arg new "$inbound_uuid" '$existing + [$new] | unique')
     
+    # Create request body
     local squad_data=$(jq -n --arg uuid "$squad_uuid" --argjson inbounds "$inbounds_array" '{
         uuid: $uuid,
         inbounds: $inbounds
@@ -2566,8 +2655,9 @@ create_user() {
 EOF
     )
 
+    # Make request with status code check
     {
-        local host_only=$(echo "http://$panel_url/api/users" | sed 's|http://||' | cut -d'/' -f1)
+        local host_only=$(echo "http://$panel_url/api/users" | sed 's|http://||' | cut -d'/' -f1 | cut -d':' -f1)
 
         local headers=(
             -H "Content-Type: application/json"
@@ -2583,6 +2673,7 @@ EOF
 
     spinner $! "$(t creating_user) $username..."
 
+    # Read response and status code
     local full_response=$(cat "$temp_file")
     local status_code="${full_response: -3}"   # Last 3 characters
     local user_response="${full_response%???}" # Everything except last 3 characters
@@ -2594,6 +2685,7 @@ EOF
         return 1
     fi
 
+    # Check for 201 status code
     if [ "$status_code" != "201" ]; then
         echo -e "${BOLD_RED}$(t api_failed_create_user_status) $status_code${NC}"
         echo
@@ -2606,6 +2698,7 @@ EOF
     fi
 
     if echo "$user_response" | jq -e '.response.uuid' >/dev/null; then
+        # Extract user data and save to global variables
         USER_UUID=$(echo "$user_response" | jq -r '.response.uuid')
         USER_SHORT_UUID=$(echo "$user_response" | jq -r '.response.shortUuid')
         USER_SUBSCRIPTION_UUID=$(echo "$user_response" | jq -r '.response.subscriptionUuid')
@@ -2644,6 +2737,7 @@ generate_x25519_keys_api() {
         return 1
     fi
     
+    # Extract keys from response
     local private_key=$(echo "$api_response" | jq -r '.response.keypairs[0].privateKey')
     local public_key=$(echo "$api_response" | jq -r '.response.keypairs[0].publicKey')
     
@@ -2652,6 +2746,7 @@ generate_x25519_keys_api() {
         return 1
     fi
     
+    # Return keys via echo
     echo "$private_key:$public_key"
 }
 
@@ -2700,11 +2795,13 @@ update_file() {
     local env_file="$1"
     shift
 
+    # Check for parameters
     if [ "$#" -eq 0 ] || [ $(($# % 2)) -ne 0 ]; then
         echo "$(t config_invalid_arguments)" >&2
         return 1
     fi
 
+    # Convert arguments to key and value arrays
     local keys=()
     local values=()
 
@@ -2714,13 +2811,16 @@ update_file() {
         shift 2
     done
 
+    # Create a temporary file
     local temp_file=$(mktemp)
 
+    # Track which keys were found so missing ones are not silently dropped
     local found=()
     for i in "${!keys[@]}"; do
         found[$i]=false
     done
 
+    # Process file line by line and replace needed lines
     while IFS= read -r line || [[ -n "$line" ]]; do
         local key_found=false
         for i in "${!keys[@]}"; do
@@ -2737,12 +2837,14 @@ update_file() {
         fi
     done <"$env_file"
 
+    # Append keys that were absent from the template
     for i in "${!keys[@]}"; do
         if [ "${found[$i]}" = false ]; then
             echo "${keys[$i]}=${values[$i]}" >>"$temp_file"
         fi
     done
 
+    # Replace original file
     mv "$temp_file" "$env_file"
 }
 
@@ -2780,24 +2882,28 @@ collect_telegram_config() {
 
         TELEGRAM_NOTIFY_NODES=$(collect_telegram_channel "$(t telegram_nodes_chat_id)")
 
+        # Ask about user notifications (optional)
         if prompt_yes_no "$(t telegram_enable_user_notifications)"; then
             TELEGRAM_NOTIFY_USERS=$(collect_telegram_channel "$(t telegram_users_chat_id)")
         else
             TELEGRAM_NOTIFY_USERS=""
         fi
 
+        # Ask about CRM notifications (optional)
         if prompt_yes_no "$(t telegram_enable_crm_notifications)"; then
             TELEGRAM_NOTIFY_CRM=$(collect_telegram_channel "$(t telegram_crm_chat_id)")
         else
             TELEGRAM_NOTIFY_CRM=""
         fi
 
+        # Ask about service notifications (optional)
         if prompt_yes_no "$(t telegram_enable_service_notifications)"; then
             TELEGRAM_NOTIFY_SERVICE=$(collect_telegram_channel "$(t telegram_service_chat_id)")
         else
             TELEGRAM_NOTIFY_SERVICE=""
         fi
 
+        # Ask about TBLOCKER notifications (optional)
         if prompt_yes_no "$(t telegram_enable_tblocker_notifications)"; then
             TELEGRAM_NOTIFY_TBLOCKER=$(collect_telegram_channel "$(t telegram_tblocker_chat_id)")
         else
@@ -2831,11 +2937,14 @@ check_domain_uniqueness() {
 }
 
 collect_domain_config() {
+    # First, collect panel domain
     PANEL_DOMAIN=$(prompt_domain "$(t domain_panel_prompt)")
 
+    # Then collect subscription domain with uniqueness check
     while true; do
         SUB_DOMAIN=$(prompt_domain "$(t domain_subscription_prompt)")
 
+        # Check that subscription domain is different from panel domain
         if check_domain_uniqueness "$SUB_DOMAIN" "subscription" "$PANEL_DOMAIN"; then
             break
         fi
@@ -2848,6 +2957,7 @@ collect_ports_all_in_one() {
 }
 
 collect_ports_separate_installation() {
+    # Check Node API port 2222
     if NODE_PORT=$(check_required_port "2222"); then
         show_info "$(t config_node_port_available)"
     else
@@ -2860,6 +2970,9 @@ collect_ports_separate_installation() {
 }
 
 setup_panel_environment() {
+    # Download environment template
+    # For alpha branch, use dev branch's .env file
+    # For numeric versions, use main branch's .env file
     local env_branch="$REMNAWAVE_BRANCH"
     if [ "$REMNAWAVE_BRANCH" = "alpha" ]; then
         env_branch="dev"
@@ -2868,6 +2981,7 @@ setup_panel_environment() {
     fi
     curl -s -o .env "$REMNAWAVE_BACKEND_REPO/$env_branch/.env.sample"
 
+    # Update environment file
     update_file ".env" \
         "JWT_AUTH_SECRET" "$JWT_AUTH_SECRET" \
         "JWT_API_TOKENS_SECRET" "$JWT_API_TOKENS_SECRET" \
@@ -3012,6 +3126,7 @@ volumes:
     external: false
 EOF
 
+    # Replace Docker image tag placeholder with actual value
     sed -i "s/REMNAWAVE_BACKEND_TAG_PLACEHOLDER/$REMNAWAVE_BACKEND_TAG/g" docker-compose.yml
 }
 
@@ -3021,13 +3136,17 @@ EOF
 validate_ip() {
     local input="$1"
 
+    # Trim spaces
     input=$(echo "$input" | tr -d ' ')
 
+    # If empty, fail
     if [ -z "$input" ]; then
         return 1
     fi
 
+    # Check for IP pattern
     if [[ $input =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+        # Validate each octet is <= 255
         IFS='.' read -r -a octets <<<"$input"
         for octet in "${octets[@]}"; do
             if [ "$octet" -gt 255 ]; then
@@ -3045,16 +3164,20 @@ validate_domain_name() {
     local input="$1"
     local max_length="${2:-253}" # Maximum domain length by standard
 
+    # Trim spaces
     input=$(echo "$input" | tr -d ' ')
 
+    # If empty, fail
     if [ -z "$input" ]; then
         return 1
     fi
 
+    # Check length
     if [ ${#input} -gt $max_length ]; then
         return 1
     fi
 
+    # Domain pattern validation - must contain at least one dot and not start/end with dot or dash
     if [[ $input =~ ^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)+$ ]] &&
         [[ ! $input =~ \.\. ]]; then
         echo "$input"
@@ -3068,12 +3191,14 @@ validate_domain() {
     local input="$1"
     local max_length="${2:-253}"
 
+    # Try as IP first
     local result=$(validate_ip "$input")
     if [ $? -eq 0 ]; then
         echo "$result"
         return 0
     fi
 
+    # Try as domain name
     result=$(validate_domain_name "$input" "$max_length")
     if [ $? -eq 0 ]; then
         echo "$result"
@@ -3095,6 +3220,7 @@ prompt_number() {
         read number
         echo >&2
 
+        # Number validation
         if [[ "$number" =~ ^[0-9]+$ ]]; then
             if [ -n "$min" ] && [ "$number" -lt "$min" ]; then
                 echo -e "${BOLD_RED}$(t validation_value_min) ${min}.${NC}" >&2
@@ -3118,19 +3244,23 @@ prompt_number() {
 validate_ssl_certificate() {
     local certificate="$1"
 
+    # Check if certificate is empty
     if [ -z "$certificate" ]; then
         return 1
     fi
 
+    # Check if it's valid base64
     if ! echo "$certificate" | base64 -d >/dev/null 2>&1; then
         return 1
     fi
 
+    # Try to decode and check if it's valid JSON
     local decoded_json
     if ! decoded_json=$(echo "$certificate" | base64 -d 2>/dev/null); then
         return 1
     fi
 
+    # Check if decoded content is valid JSON and contains required fields
     if ! echo "$decoded_json" | jq -e '.nodeCertPem and .nodeKeyPem and .caCertPem and .jwtPublicKey' >/dev/null 2>&1; then
         return 1
     fi
@@ -3217,6 +3347,7 @@ generate_qr_code() {
         return 1
     fi
 
+    # Check if qrencode is available
     if command -v qrencode &>/dev/null; then
         echo -e "\033[1m$title:\033[0m"
         echo
@@ -3243,6 +3374,7 @@ generate_vless_keys() {
   local token="$2"
   local panel_domain="$3"
   
+  # Try to generate keys using panel API first
   if [ -n "$panel_url" ] && [ -n "$token" ] && [ -n "$panel_domain" ]; then
     local api_keys=$(generate_x25519_keys_api "$panel_url" "$token" "$panel_domain")
     if [ $? -eq 0 ] && [ -n "$api_keys" ]; then
@@ -3251,8 +3383,10 @@ generate_vless_keys() {
     fi
   fi
   
+  # Fallback to Docker method if API fails or parameters not provided
   local temp_file=$(mktemp)
 
+  # Generate x25519 keys using Docker
   docker run --rm ghcr.io/xtls/xray-core x25519 >"$temp_file" 2>&1 &
   spinner $! "$(t spinner_generating_keys)"
   keys=$(cat "$temp_file")
@@ -3266,6 +3400,7 @@ generate_vless_keys() {
     return 1
   fi
 
+  # Return keys via echo
   echo "$private_key:$public_key"
 }
 
@@ -3546,6 +3681,7 @@ EOF
 run_remnawave_cli() {
     echo
 
+    # Check if remnawave container is running
     if ! docker ps --format '{{.Names}}' | grep -q '^remnawave$'; then
         show_error "$(t cli_container_not_running)"
         echo -e "${YELLOW}$(t cli_ensure_panel_running)${NC}"
@@ -3555,9 +3691,11 @@ run_remnawave_cli() {
         return 0
     fi
 
+    # Save current file descriptors
     exec 3>&1 4>&2
     exec >/dev/tty 2>&1
 
+    # Run the CLI
     if docker exec -it -e TERM=xterm-256color remnawave remnawave; then
         echo
         show_success "$(t cli_session_completed)"
@@ -3571,6 +3709,7 @@ run_remnawave_cli() {
         return 0
     fi
 
+    # Restore file descriptors
     exec 1>&3 2>&4
 
     echo
@@ -3582,8 +3721,10 @@ run_remnawave_cli() {
 
 is_bbr_enabled() {
   local cc qd
+  # Check if BBR is enabled in /etc/sysctl.conf
   if grep -q "net.ipv4.tcp_congestion_control=bbr" /etc/sysctl.conf 2>/dev/null &&
     grep -q "net.core.default_qdisc=fq" /etc/sysctl.conf 2>/dev/null; then
+    # Really active?
     cc=$(sysctl -n net.ipv4.tcp_congestion_control 2>/dev/null)
     qd=$(sysctl -n net.core.default_qdisc 2>/dev/null)
     [[ $cc == "bbr" && $qd == "fq" ]] && return 0
@@ -3601,6 +3742,7 @@ get_bbr_menu_text() {
 
 apply_qdisc_now() {
   local dev
+  # Check if tc command exists
   if ! command -v tc >/dev/null 2>&1; then
     return 0
   fi
@@ -3610,10 +3752,12 @@ apply_qdisc_now() {
 }
 
 load_bbr_module() {
+  # Check if modprobe exists
   if ! command -v modprobe >/dev/null 2>&1; then
     return 0
   fi
   
+  # Check if module is already loaded
   if lsmod 2>/dev/null | grep -q tcp_bbr; then
     return 0
   fi
@@ -3626,16 +3770,19 @@ enable_bbr() {
 
   load_bbr_module
 
+  # Remove existing BBR settings
   sed -i -E \
     -e '/^\s*net\.core\.default_qdisc\s*=/d' \
     -e '/^\s*net\.ipv4\.tcp_congestion_control\s*=/d' \
     /etc/sysctl.conf 2>/dev/null || true
 
+  # Add BBR settings
   {
     echo "net.core.default_qdisc=fq"
     echo "net.ipv4.tcp_congestion_control=bbr"
   } >>/etc/sysctl.conf
 
+  # Apply settings
   sysctl -p >/dev/null 2>&1
 
   apply_qdisc_now
@@ -3682,20 +3829,25 @@ show_panel_credentials() {
 
     local credentials_file="/opt/remnawave/credentials.txt"
 
+    # Check if credentials file exists
     if [ -f "$credentials_file" ]; then
         echo -e "${BOLD_GREEN}$(t credentials_found)${NC}"
         echo
 
+        # Display file content with proper formatting
         while IFS= read -r line; do
             if [[ "$line" =~ ^[[:space:]]*$ ]]; then
                 echo
             elif [[ "$line" =~ ^[[:space:]]*#.*$ ]] || [[ "$line" =~ ^[[:space:]]*\[.*\][[:space:]]*$ ]]; then
+                # Headers and comments in yellow
                 echo -e "${YELLOW}$line${NC}"
             elif [[ "$line" =~ .*:.*$ ]]; then
+                # Key-value pairs: key in orange, value in green
                 local key=$(echo "$line" | cut -d':' -f1)
                 local value=$(echo "$line" | cut -d':' -f2-)
                 echo -e "${ORANGE}$key:${GREEN}$value${NC}"
             else
+                # Regular text in default color
                 echo -e "${NC}$line"
             fi
         done < "$credentials_file"
@@ -3761,12 +3913,14 @@ is_firewall_port_open() {
         ufw status | grep -q "8443.*ALLOW"
         return $?
     fi
+    # If UFW is not active, consider port as open (no firewall blocking)
     return 0
 }
 
 get_auth_type() {
     local caddyfile=""
 
+    # Check all-in-one installation first
     if [ -f "$REMNAWAVE_DIR/Caddyfile" ]; then
         caddyfile="$REMNAWAVE_DIR/Caddyfile"
     elif [ -f "$REMNAWAVE_DIR/caddy/Caddyfile" ]; then
@@ -3814,12 +3968,15 @@ get_panel_access_link() {
         return 1
     fi
 
+    # Extract domain from credentials
     local panel_domain=$(grep "PANEL URL:" "$credentials_file" | sed 's|PANEL URL: https://||' | cut -d'/' -f1 | cut -d'?' -f1)
 
     if [ "$auth_type" = "cookie" ]; then
+        # For cookie-auth extract secret key from credentials URL
         local secret_key=$(grep "PANEL URL:" "$credentials_file" | grep -oP 'caddy=\K[^&\s]+')
         echo "https://${panel_domain}:8443/auth/login?caddy=${secret_key}"
     else
+        # For full-auth need custom login route
         local login_route=$(grep "PANEL URL:" "$credentials_file" | sed 's|.*https://[^/]*/||' | cut -d'/' -f1)
         echo "https://${panel_domain}:8443/${login_route}"
     fi
@@ -3842,9 +3999,11 @@ add_8443_section() {
         return 1
     fi
 
+    # Find the line with ":80 {" and insert before it
     local temp_file=$(mktemp)
 
     if [ "$auth_type" = "cookie" ]; then
+        # Insert 8443 section before ":80 {" block
         awk '/:80 \{/ {
             print ""
             print "# Emergency access port (direct, without Xray)"
@@ -3876,6 +4035,7 @@ add_8443_section() {
             print ""
         } {print}' "$caddyfile" > "$temp_file"
     else
+        # Full auth - insert before ":80 {"
         awk '/:80 \{/ {
             print ""
             print "# Emergency access port (direct, without Xray)"
@@ -3932,6 +4092,7 @@ remove_8443_section() {
 
     local temp_file=$(mktemp)
 
+    # Remove the 8443 section including the comment
     awk '
         /^# Emergency access port/ { skip = 1; next }
         /^https:\/\/.*:8443/ { skip = 1; next }
@@ -3953,11 +4114,13 @@ restart_caddy() {
 
     cd "$compose_dir"
 
+    # Determine compose file name
     local compose_file="docker-compose.yml"
     if [ -f "docker-compose.caddy.yml" ]; then
         compose_file="docker-compose.caddy.yml"
     fi
 
+    # Restart only caddy service
     if [ "$compose_file" = "docker-compose.caddy.yml" ]; then
         docker compose -f "$compose_file" restart caddy >/dev/null 2>&1 || \
         docker compose -f "$compose_file" restart remnawave-caddy >/dev/null 2>&1
@@ -3972,6 +4135,7 @@ open_panel_access() {
         return 1
     fi
 
+    # Check if already fully open (section exists and firewall allows)
     if has_8443_section && is_firewall_port_open; then
         show_warning "$(t panel_access_already_open)"
         local access_link=$(get_panel_access_link)
@@ -3984,13 +4148,16 @@ open_panel_access() {
         return 0
     fi
 
+    # Run enabling with spinner
     (
+        # Add 8443 section to Caddyfile if not exists
         if ! has_8443_section; then
             add_8443_section
             restart_caddy
             sleep 2
         fi
 
+        # Open port in firewall
         open_firewall_port
     ) &
     spinner $! "$(t panel_access_enabling)"
@@ -4014,17 +4181,21 @@ close_panel_access() {
         return 1
     fi
 
+    # Check if already closed
     if ! has_8443_section && ! is_firewall_port_open; then
         show_info "$(t panel_access_already_closed)"
         return 0
     fi
 
+    # Run disabling with spinner
     (
+        # Remove 8443 section from Caddyfile if exists
         if has_8443_section; then
             remove_8443_section
             restart_caddy
         fi
 
+        # Close port in firewall
         close_firewall_port
     ) &
     spinner $! "$(t panel_access_disabling)"
@@ -4046,6 +4217,7 @@ show_panel_access_menu() {
 }
 
 manage_panel_access() {
+    # Check if panel is installed first
     if ! check_panel_for_access; then
         echo -e "${BOLD_YELLOW}$(t prompt_enter_to_return)${NC}"
         read -r
@@ -4087,6 +4259,7 @@ check_images_updated() {
 
     cd "$compose_dir"
 
+    # Get list of images from compose file
     local images_list=$(docker compose config --images 2>/dev/null)
     if [ -z "$images_list" ]; then
         eval "$result_var=error"
@@ -4095,6 +4268,7 @@ check_images_updated() {
 
     local updates_found=false
 
+    # Check each image individually
     while IFS= read -r image; do
         if [ -n "$image" ]; then
             local output=$(docker pull "$image" 2>&1)
@@ -4121,6 +4295,7 @@ show_update_warning() {
     echo -e "${YELLOW}$(t update_warning_backup)${NC}"
     echo -e "${YELLOW}$(t update_warning_changelog)${NC}"
 
+    # Show relevant changelog links based on component type
     if [[ "$component_type" == "panel" || "$component_type" == "all" ]]; then
         echo -e "${BLUE}$(t update_warning_panel_releases)${NC}"
     fi
@@ -4131,6 +4306,7 @@ show_update_warning() {
     echo -e "${YELLOW}$(t update_warning_downtime)${NC}"
     echo
 
+    # Ask for confirmation
     if ! prompt_yes_no "$(t update_warning_confirm)" "$YELLOW"; then
         show_info "$(t update_cancelled)"
         echo -e "${BOLD_YELLOW}$(t prompt_enter_to_return)${NC}"
@@ -4144,6 +4320,7 @@ show_update_warning() {
 update_panel_only() {
     echo
 
+    # Check if panel directory exists
     if [ ! -d /opt/remnawave ]; then
         show_error "$(t update_panel_dir_not_found)"
         show_error "$(t update_install_first)"
@@ -4152,6 +4329,7 @@ update_panel_only() {
         return 0
     fi
 
+    # Check for docker-compose.yml in panel directory
     if [ ! -f /opt/remnawave/docker-compose.yml ]; then
         show_error "$(t update_compose_not_found)"
         show_error "$(t update_installation_corrupted)"
@@ -4160,11 +4338,13 @@ update_panel_only() {
         return 0
     fi
 
+    # Check if node exists on same server to determine warning type
     NODE_EXISTS=false
     if [ -d /opt/remnanode ] && [ -f /opt/remnanode/docker-compose.yml ]; then
         NODE_EXISTS=true
     fi
 
+    # Show warning and get confirmation
     if [ "$NODE_EXISTS" = true ]; then
         if ! show_update_warning "all"; then
             return 0
@@ -4175,21 +4355,25 @@ update_panel_only() {
         fi
     fi
     
+    # Check if subscription page exists
     SUBSCRIPTION_PAGE_EXISTS=false
     if [ -d /opt/remnawave/subscription-page ] && [ -f /opt/remnawave/subscription-page/docker-compose.yml ]; then
         SUBSCRIPTION_PAGE_EXISTS=true
     fi
 
+    # Check for updates and track what needs restart
     local panel_updated=false
     local subscription_updated=false
     local node_updated=false
     local any_updates=false
 
+    # Check for updates and track what needs restart
     local panel_updated=false
     local subscription_updated=false
     local node_updated=false
     local any_updates=false
 
+    # Check panel updates
     show_info "$(t update_checking_images)" "$ORANGE"
     local panel_result=""
     check_images_updated "/opt/remnawave" panel_result &
@@ -4207,6 +4391,7 @@ update_panel_only() {
         return 1
     fi
 
+    # Check subscription page updates if exists
     if [ "$SUBSCRIPTION_PAGE_EXISTS" = true ]; then
         local subscription_result=""
         check_images_updated "/opt/remnawave/subscription-page" subscription_result &
@@ -4225,6 +4410,7 @@ update_panel_only() {
         fi
     fi
 
+    # Check node updates if exists on same server
     if [ "$NODE_EXISTS" = true ]; then
         local node_result=""
         check_images_updated "/opt/remnanode" node_result &
@@ -4243,6 +4429,7 @@ update_panel_only() {
         fi
     fi
 
+    # If no updates available, exit early
     if [ "$any_updates" = false ]; then
         show_success "$(t update_no_updates_available)"
         show_info "$(t update_no_restart_needed)"
@@ -4251,10 +4438,13 @@ update_panel_only() {
         return 0
     fi
 
+    # Show what will be updated
     show_info "$(t update_images_updated)"
 
+    # Recreate updated services with new images
     show_info "$(t update_starting_services)" "$ORANGE"
 
+    # Recreate panel if it was updated
     if [ "$panel_updated" = true ]; then
         cd /opt/remnawave && docker compose up -d --remove-orphans --force-recreate >/dev/null 2>&1 &
         spinner $! "$(t update_starting_services)"
@@ -4266,6 +4456,7 @@ update_panel_only() {
         fi
     fi
 
+    # Recreate subscription page if it was updated
     if [ "$SUBSCRIPTION_PAGE_EXISTS" = true ] && [ "$subscription_updated" = true ]; then
         cd /opt/remnawave/subscription-page && docker compose up -d --remove-orphans --force-recreate >/dev/null 2>&1 &
         spinner $! "$(t update_starting_services)"
@@ -4277,6 +4468,7 @@ update_panel_only() {
         fi
     fi
 
+    # Recreate node if it was updated
     if [ "$NODE_EXISTS" = true ] && [ "$node_updated" = true ]; then
         cd /opt/remnanode && docker compose up -d --remove-orphans --force-recreate >/dev/null 2>&1 &
         spinner $! "$(t update_starting_services)"
@@ -4288,10 +4480,12 @@ update_panel_only() {
         fi
     fi
     
+    # Clean unused images
     show_info "$(t update_cleaning_images)" "$ORANGE"
     docker image prune -f >/dev/null 2>&1 &
     spinner $! "$(t update_cleaning_images)"
     
+    # Show success message
     if [ "$NODE_EXISTS" = true ]; then
         show_success "$(t update_all_success)"
     else
@@ -4307,6 +4501,7 @@ update_panel_only() {
 update_node_only() {
     echo
 
+    # Check if node directory exists
     if [ ! -d /opt/remnanode ]; then
         show_error "$(t update_node_dir_not_found)"
         show_error "$(t update_install_first)"
@@ -4315,6 +4510,7 @@ update_node_only() {
         return 0
     fi
 
+    # Check for docker-compose.yml in node directory
     if [ ! -f /opt/remnanode/docker-compose.yml ]; then
         show_error "$(t update_compose_not_found)"
         show_error "$(t update_installation_corrupted)"
@@ -4323,10 +4519,12 @@ update_node_only() {
         return 0
     fi
 
+    # Show warning and get confirmation
     if ! show_update_warning "node"; then
         return 0
     fi
 
+    # Check for updates
     show_info "$(t update_checking_images)" "$ORANGE"
     local node_result=""
     check_images_updated "/opt/remnanode" node_result &
@@ -4349,6 +4547,7 @@ update_node_only() {
         return 1
     fi
 
+    # Recreate services with new images
     show_info "$(t update_starting_services)" "$ORANGE"
     cd /opt/remnanode && docker compose up -d --remove-orphans --force-recreate >/dev/null 2>&1 &
     spinner $! "$(t update_starting_services)"
@@ -4359,6 +4558,7 @@ update_node_only() {
         return 1
     fi
     
+    # Clean unused images
     show_info "$(t update_cleaning_images)" "$ORANGE"
     docker image prune -f >/dev/null 2>&1 &
     spinner $! "$(t update_cleaning_images)"
@@ -4638,6 +4838,7 @@ update_profiles_for_selected_nodes() {
         return 1
     fi
     
+    # Group selected nodes by their profile UUID
     local profile_groups=$(
         for node_info in "${SELECTED_NODES[@]}"; do
             local node_uuid="${node_info%%|*}"
@@ -4666,6 +4867,7 @@ update_profiles_for_selected_nodes() {
         local profile_uuid=$(echo "$group" | jq -r '.profile')
         local node_names=$(echo "$group" | jq -r '.nodes | join(", ")')
         
+        # Get profile configuration
         local current_config=$(echo "$profiles_response" | jq -r ".response.configProfiles[] | select(.uuid == \"$profile_uuid\") | .config" 2>/dev/null)
         
         if [ -z "$current_config" ] || [ "$current_config" = "null" ]; then
@@ -4673,13 +4875,16 @@ update_profiles_for_selected_nodes() {
             continue
         fi
         
+        # Get profile name
         local profile_name=$(echo "$profiles_response" | jq -r ".response.configProfiles[] | select(.uuid == \"$profile_uuid\") | .name // \"$profile_uuid\"" 2>/dev/null)
         
+        # Check if WARP already configured in this profile
         if echo "$current_config" | jq -e '.outbounds[] | select(.tag == "warp-out")' >/dev/null 2>&1; then
             show_warning "$(t warp_already_configured) ($(t warp_profile): $profile_name, $(t warp_nodes_lowercase): $node_names)"
             continue
         fi
         
+        # Add WARP outbound
         local warp_outbound=$(cat <<'EOF'
 {
   "tag": "warp-out",
@@ -4702,6 +4907,7 @@ EOF
             continue
         fi
         
+        # Add WARP routing rules
         local warp_routing_rule=$(cat <<'EOF'
 {
   "domain": [
@@ -4715,6 +4921,7 @@ EOF
 EOF
         )
         
+        # Ensure routing and rules exist before adding
         updated_config=$(echo "$updated_config" | jq 'if .routing == null then .routing = {} else . end')
         updated_config=$(echo "$updated_config" | jq 'if .routing.rules == null then .routing.rules = [] else . end')
         updated_config=$(echo "$updated_config" | jq --argjson warp_rule "$warp_routing_rule" '.routing.rules += [$warp_rule]')
@@ -4724,6 +4931,7 @@ EOF
             continue
         fi
         
+        # Update profile
         local update_data=$(jq -n --arg uuid "$profile_uuid" --argjson config "$updated_config" '{
             uuid: $uuid,
             config: $config
@@ -4742,6 +4950,7 @@ EOF
         
         if echo "$update_response" | jq -e '.response.uuid' >/dev/null 2>&1; then
             ((profiles_updated++))
+            # Store updated info in temp file to pass to parent shell
             echo "$node_names|$profile_name" >> /tmp/warp_updated_profiles.tmp
             show_success "$(t warp_profile_updated): $node_names"
         else
@@ -4751,6 +4960,7 @@ EOF
         fi
     done
     
+    # Read updated profiles info from temp file
     if [ -f /tmp/warp_updated_profiles.tmp ]; then
         while IFS='|' read -r nodes profile; do
             UPDATED_PROFILES_INFO+=("$nodes ($(t warp_profile): $profile)")
@@ -4797,12 +5007,14 @@ install_docker_warp_native() {
 }
 
 show_warp_config_changes() {
+    # Take updated profiles info as parameters
     local updated_profiles=("$@")
     
     clear
     echo -e "${BOLD_GREEN}$(t warp_docker_config_added)${NC}"
     echo
     
+    # Show affected nodes and profiles
     if [ ${#updated_profiles[@]} -gt 0 ]; then
         echo -e "${BOLD_BLUE}$(t warp_affected_nodes_profiles):${NC}"
         echo
@@ -4992,10 +5204,13 @@ view_logs() {
     local has_panel=false
     local has_node=false
 
+    # Check what's installed
     [ -d "$REMNAWAVE_DIR" ] && has_panel=true
     [ -d "$LOCAL_REMNANODE_DIR" ] && has_node=true
+    # Also check standalone node installation
     [ -d "$REMNANODE_DIR" ] && has_node=true
 
+    # Nothing installed
     if [ "$has_panel" = false ] && [ "$has_node" = false ]; then
         echo
         show_error "$(t logs_dir_not_found)"
@@ -5004,6 +5219,7 @@ view_logs() {
         return 1
     fi
 
+    # If both panel and node exist (all-in-one), show menu
     if [ "$has_panel" = true ] && [ -d "$LOCAL_REMNANODE_DIR" ]; then
         echo
         echo -e "${BOLD_GREEN}$(t logs_select_component)${NC}"
@@ -5030,6 +5246,7 @@ view_logs() {
 
     cd "$dir"
 
+    # Check if any containers are running
     if ! docker compose ps -q 2>/dev/null | grep -q .; then
         echo
         show_error "$(t logs_container_not_running)"
@@ -5085,6 +5302,7 @@ display_full_auth_results() {
     local installation_type="${1:-panel}"
     local caddy_auth_url="https://$PANEL_DOMAIN/$CUSTOM_LOGIN_ROUTE/auth"
 
+    # Calculate width based on longest line
     local max_width=${#caddy_auth_url}
     if [ -n "$USER_SUBSCRIPTION_URL" ] && [ "$installation_type" = "all-in-one" ]; then
         if [ ${#USER_SUBSCRIPTION_URL} -gt $max_width ]; then
@@ -5110,6 +5328,7 @@ display_full_auth_results() {
     print_text_line "$caddy_auth_url"
     print_empty_line
 
+    # Show subscription URL only for all-in-one installation
     if [ "$installation_type" = "all-in-one" ] && [ -n "$USER_SUBSCRIPTION_URL" ] && [ "$USER_SUBSCRIPTION_URL" != "null" ]; then
         print_text_line "$(t results_user_subscription_url)"
         print_text_line "$USER_SUBSCRIPTION_URL"
@@ -5129,6 +5348,7 @@ display_full_auth_results() {
     echo -e "${BOLD_BLUE}$(t info_installation_directory) ${NC}$REMNAWAVE_DIR/"
     echo
 
+    # Show QR code for subscription URL if available
     if [ "$installation_type" = "all-in-one" ] && [ -n "$USER_SUBSCRIPTION_URL" ] && [ "$USER_SUBSCRIPTION_URL" != "null" ]; then
         generate_qr_code "$USER_SUBSCRIPTION_URL" "$(t qr_subscription_url)"
         echo
@@ -5166,6 +5386,7 @@ display_cookie_auth_results() {
   local installation_type="${1:-panel}" # Default to panel if not specified
   local secure_panel_url="https://$PANEL_DOMAIN/auth/login?caddy=$PANEL_SECRET_KEY"
 
+  # Calculate width based on longest line
   local max_width=${#secure_panel_url}
   if [ -n "$USER_SUBSCRIPTION_URL" ] && [ "$installation_type" = "all-in-one" ]; then
     if [ ${#USER_SUBSCRIPTION_URL} -gt $max_width ]; then
@@ -5192,6 +5413,7 @@ display_cookie_auth_results() {
   print_text_line "$secure_panel_url"
   print_empty_line
 
+  # Show subscription URL only for all-in-one installation
   if [ "$installation_type" = "all-in-one" ] && [ -n "$USER_SUBSCRIPTION_URL" ] && [ "$USER_SUBSCRIPTION_URL" != "null" ]; then
     print_text_line "$(t results_user_subscription_url)"
     print_text_line "$USER_SUBSCRIPTION_URL"
@@ -5208,6 +5430,7 @@ display_cookie_auth_results() {
   echo -e "${BOLD_BLUE}$(t info_installation_directory) ${NC}$REMNAWAVE_DIR/"
   echo
 
+  # Show QR code for subscription URL if available
   if [ "$installation_type" = "all-in-one" ] && [ -n "$USER_SUBSCRIPTION_URL" ] && [ "$USER_SUBSCRIPTION_URL" != "null" ]; then
     generate_qr_code "$USER_SUBSCRIPTION_URL" "$(t qr_subscription_url)"
     echo
@@ -5226,6 +5449,7 @@ create_static_site() {
 
   mkdir -p "$directory/html"
 
+  # Change to the html directory to generate files there
   (
     cd "$directory/html"
     generate_selfsteal_form
@@ -5282,8 +5506,10 @@ configure_vless_panel_only() {
     local panel_url="127.0.0.1:3000"
     local config_file="$REMNAWAVE_DIR/config.json"
 
+    # Collect node host info
     NODE_HOST=$(simple_read_domain_or_ip "$(t vless_enter_node_host)" "$SELF_STEAL_DOMAIN")
 
+    # Generate VLESS keys
     local keys_result=$(generate_vless_keys "$panel_url" "$REG_TOKEN" "$PANEL_DOMAIN")
     if [ $? -ne 0 ]; then
         return 1
@@ -5293,17 +5519,22 @@ configure_vless_panel_only() {
 
     generate_xray_config "$config_file" "$SELF_STEAL_DOMAIN" "$CADDY_SOCKET_PATH" "$private_key"
 
+    # Read the generated config
     local xray_config=$(cat "$config_file")
 
+    # Delete the first (default) profile before creating new one
     local profiles_response=$(get_config_profiles "$panel_url" "$REG_TOKEN" "$PANEL_DOMAIN")
     if [ -n "$profiles_response" ]; then
+        # Get first profile UUID
         local default_profile_uuid=$(echo "$profiles_response" | jq -r '.response.configProfiles[0].uuid // empty' 2>/dev/null)
         
         if [ -n "$default_profile_uuid" ] && [ "$default_profile_uuid" != "null" ]; then
+            # Delete the first profile
             delete_config_profile "$panel_url" "$REG_TOKEN" "$PANEL_DOMAIN" "$default_profile_uuid"
         fi
     fi
 
+    # Create config profile
     local profile_result=$(create_config_profile "$panel_url" "$REG_TOKEN" "$PANEL_DOMAIN" "StealConfig" "$xray_config")
     if [ -z "$profile_result" ]; then
         return 1
@@ -5312,21 +5543,26 @@ configure_vless_panel_only() {
     local profile_uuid=$(echo "$profile_result" | cut -d':' -f1)
     local inbound_uuid=$(echo "$profile_result" | cut -d':' -f2)
 
+    # Create node entry in panel with config profile
     if ! create_node "$panel_url" "$REG_TOKEN" "$PANEL_DOMAIN" "$NODE_HOST" "$NODE_PORT" "$profile_uuid" "$inbound_uuid"; then
         return 1
     fi
 
+    # Create host entry with new structure
     if ! create_host "$panel_url" "$REG_TOKEN" "$PANEL_DOMAIN" "$profile_uuid" "$inbound_uuid" "$SELF_STEAL_DOMAIN"; then
         return 1
     fi
 
+    # Get squads and update with new inbound
     local squads_response=$(get_squads "$panel_url" "$REG_TOKEN" "$PANEL_DOMAIN")
     if [ -z "$squads_response" ]; then
         return 1
     fi
 
+    # Get first squad UUID (в alpha версии может не быть squad'а с именем Default)
     local squad_uuid=$(echo "$squads_response" | jq -r '.response.internalSquads[0].uuid' 2>/dev/null)
     
+    # Check if we found any squad
     if [ -z "$squad_uuid" ] || [ "$squad_uuid" = "null" ]; then
         echo -e "${BOLD_RED}Error: No squads found${NC}"
         echo "Squads response:"
@@ -5334,14 +5570,17 @@ configure_vless_panel_only() {
         return 1
     fi
 
+    # Update squad with new inbound
     if ! update_squad "$panel_url" "$REG_TOKEN" "$PANEL_DOMAIN" "$squad_uuid" "$inbound_uuid"; then
         return 1
     fi
 
+    # Create default user
     if ! create_user "$panel_url" "$REG_TOKEN" "$PANEL_DOMAIN" "remnawave" "$squad_uuid"; then
         return 1
     fi
 
+    # Display public key for manual node setup
     local pubkey=$(get_public_key "$panel_url" "$REG_TOKEN" "$PANEL_DOMAIN")
     if [ -n "$pubkey" ]; then
         echo
@@ -5391,6 +5630,7 @@ volumes:
     name: remnawave-caddy-ssl-data
 EOF
 
+    # Creating the Caddyfile
     cat >Caddyfile <<"EOF"
 {
     admin   off
@@ -5437,8 +5677,10 @@ https://{$SUB_DOMAIN} {
 }
 EOF
 
+    # Creating Makefile
     create_makefile "$REMNAWAVE_DIR/caddy"
 
+    # Creating stub site
     create_static_site "$REMNAWAVE_DIR/caddy"
 }
 
@@ -5447,6 +5689,7 @@ EOF
 setup_caddy_panel_only_full_auth() {
     cd $REMNAWAVE_DIR/caddy
 
+    # Creating the Caddyfile
     cat >Caddyfile <<"EOF"
 {
     admin   off
@@ -5561,6 +5804,7 @@ https://{$CADDY_SUB_DOMAIN} {
 }
 EOF
 
+    # Creating docker-compose.yml for Caddy
     cat >docker-compose.yml <<EOF
 services:
     remnawave-caddy:
@@ -5616,8 +5860,12 @@ generate_secrets_panel_only() {
 
 collect_selfsteal_domain_for_panel() {
     while true; do
+        # 3 - true show_warning
+        # 4 - false allow_cf_proxy
+        # 5 - true expect_different_ip
         SELF_STEAL_DOMAIN=$(prompt_domain "$(t domain_selfsteal_prompt)" "$ORANGE" true false true)
 
+        # Check that selfsteal domain is different from panel and subscription domains
         if check_domain_uniqueness "$SELF_STEAL_DOMAIN" "selfsteal" "$PANEL_DOMAIN" "$SUB_DOMAIN"; then
             break
         fi
@@ -5633,6 +5881,7 @@ collect_config_panel_only() {
     collect_domain_config
     collect_selfsteal_domain_for_panel
 
+    # Use separate installation port collection
     if ! collect_ports_separate_installation; then
         return 1
     fi
@@ -5683,17 +5932,21 @@ save_and_display_panel_only() {
 install_panel_only() {
     local auth_type=$1
 
+    # Validate auth type
     if [[ "$auth_type" != "cookie" && "$auth_type" != "full" ]]; then
         show_error "$(t panel_invalid_auth_type): $auth_type. $(t panel_auth_type_options)"
         return 1
     fi
 
+    # Preparation
     if ! prepare_installation; then
         return 1
     fi
 
+    # Generate secrets
     generate_secrets_panel_only $auth_type
 
+    # Collect configuration
     if ! collect_config_panel_only $auth_type; then
         return 1
     fi
@@ -5704,14 +5957,17 @@ install_panel_only() {
 
     create_makefile "$REMNAWAVE_DIR"
 
+    # Setup Caddy
     setup_caddy_panel_only $auth_type
 
     start_panel
     start_caddy_panel_only $auth_type
 
+    # Register user and configure VLESS
     register_panel_user
     configure_vless_panel_only
 
+    # Create API token and setup subscription page
     SUBSCRIPTION_API_TOKEN=$(create_api_token "127.0.0.1:3000" "$REG_TOKEN" "$PANEL_DOMAIN")
     if [ -z "$SUBSCRIPTION_API_TOKEN" ]; then
         show_error "$(t api_failed_create_token)"
@@ -5720,6 +5976,7 @@ install_panel_only() {
     setup_remnawave-subscription-page "$SUBSCRIPTION_API_TOKEN"
     start_subscription_page
 
+    # Save credentials and display results
     save_and_display_panel_only $auth_type
 }
 
@@ -5980,6 +6237,7 @@ collect_node_selfsteal_domain() {
 }
 
 check_node_ports() {
+    # Check required Node API port 2222
     if NODE_PORT=$(check_required_port "2222"); then
         show_info "$(t config_node_port_available)"
     else
@@ -6005,6 +6263,7 @@ collect_node_ssl_certificate() {
             fi
         done
 
+        # Validate SSL certificate format
         if validate_ssl_certificate "$CERTIFICATE"; then
             echo -e "${BOLD_GREEN}$(t node_ssl_cert_valid)${NC}"
             echo
@@ -6035,6 +6294,7 @@ allow_ufw_node_port_from_panel_ip() {
 }
 
 start_node_and_show_results() {
+    # Wait for Caddy socket before starting Node (only for socket mode)
     if [ "$XRAY_CONNECTION_TYPE" = "socket" ]; then
         if ! wait_for_caddy_socket 30; then
             show_error "$(t error_caddy_socket_timeout)"
@@ -6055,6 +6315,7 @@ start_node_and_show_results() {
 setup_node() {
     clear
 
+    # Preparation for node-only installation
     if ! prepare_node_installation; then
         return 1
     fi
@@ -6067,14 +6328,18 @@ setup_node() {
 
     check_node_ports
 
+    # Select Xray connection type (socket or port)
     select_xray_connection_type
 
     collect_node_ssl_certificate
 
+    # Create node docker-compose
     create_node_docker_compose "$CERTIFICATE"
 
+    # Setup and start Caddy (in selfsteal.sh) with selected connection type
     setup_selfsteal "$XRAY_CONNECTION_TYPE"
 
+    # Start node (waits for Caddy socket if using socket mode)
     start_node_and_show_results
 
     unset CERTIFICATE
@@ -6094,6 +6359,7 @@ configure_vless_all_in_one() {
     local config_file="$REMNAWAVE_DIR/config.json"
     local node_host="172.17.0.1"  # Docker bridge IP
     
+    # Generate VLESS keys
     local keys_result=$(generate_vless_keys "$panel_url" "$REG_TOKEN" "$PANEL_DOMAIN")
     if [ $? -ne 0 ]; then
         return 1
@@ -6103,17 +6369,22 @@ configure_vless_all_in_one() {
     
     generate_xray_config "$config_file" "$SELF_STEAL_DOMAIN" "$CADDY_SOCKET_PATH" "$private_key"
     
+    # Read the generated config
     local xray_config=$(cat "$config_file")
     
+    # Delete the first (default) profile before creating new one
     local profiles_response=$(get_config_profiles "$panel_url" "$REG_TOKEN" "$PANEL_DOMAIN")
     if [ -n "$profiles_response" ]; then
+        # Get first profile UUID
         local default_profile_uuid=$(echo "$profiles_response" | jq -r '.response.configProfiles[0].uuid // empty' 2>/dev/null)
         
         if [ -n "$default_profile_uuid" ] && [ "$default_profile_uuid" != "null" ]; then
+            # Delete the first profile
             delete_config_profile "$panel_url" "$REG_TOKEN" "$PANEL_DOMAIN" "$default_profile_uuid"
         fi
     fi
     
+    # Create config profile
     local profile_result=$(create_config_profile "$panel_url" "$REG_TOKEN" "$PANEL_DOMAIN" "StealConfig" "$xray_config")
     if [ -z "$profile_result" ]; then
         return 1
@@ -6122,21 +6393,26 @@ configure_vless_all_in_one() {
     local profile_uuid=$(echo "$profile_result" | cut -d':' -f1)
     local inbound_uuid=$(echo "$profile_result" | cut -d':' -f2)
     
+    # Create node entry in panel with config profile
     if ! create_node "$panel_url" "$REG_TOKEN" "$PANEL_DOMAIN" "$node_host" "$NODE_PORT" "$profile_uuid" "$inbound_uuid"; then
         return 1
     fi
     
+    # Create host entry with new structure
     if ! create_host "$panel_url" "$REG_TOKEN" "$PANEL_DOMAIN" "$profile_uuid" "$inbound_uuid" "$SELF_STEAL_DOMAIN"; then
         return 1
     fi
     
+    # Get squads and update with new inbound
     local squads_response=$(get_squads "$panel_url" "$REG_TOKEN" "$PANEL_DOMAIN")
     if [ -z "$squads_response" ]; then
         return 1
     fi
     
+    # Get first squad UUID (в alpha версии может не быть squad'а с именем Default)
     local squad_uuid=$(echo "$squads_response" | jq -r '.response.internalSquads[0].uuid' 2>/dev/null)
     
+    # Check if we found any squad
     if [ -z "$squad_uuid" ] || [ "$squad_uuid" = "null" ]; then
         echo -e "${BOLD_RED}Error: No squads found${NC}"
         echo "Squads response:"
@@ -6144,10 +6420,12 @@ configure_vless_all_in_one() {
         return 1
     fi
     
+    # Update squad with new inbound
     if ! update_squad "$panel_url" "$REG_TOKEN" "$PANEL_DOMAIN" "$squad_uuid" "$inbound_uuid"; then
         return 1
     fi
 
+    # Create default user
     if ! create_user "$panel_url" "$REG_TOKEN" "$PANEL_DOMAIN" "remnawave" "$squad_uuid"; then
         return 1
     fi
@@ -6234,6 +6512,7 @@ setup_caddy_all_in_one_cookie_auth() {
     mkdir -p "$REMNAWAVE_DIR/caddy"
     cd "$REMNAWAVE_DIR/caddy"
 
+    # Creating the Caddyfile
     cat >Caddyfile <<"EOF"
 {
     admin   off
@@ -6363,6 +6642,7 @@ setup_caddy_all_in_one_full_auth() {
     mkdir -p "$REMNAWAVE_DIR/caddy"
     cd "$REMNAWAVE_DIR/caddy"
 
+    # Creating the Caddyfile
     cat >Caddyfile <<"EOF"
 {
     admin   off
@@ -6570,6 +6850,7 @@ generate_secrets_all_in_one() {
 setup_caddy_all_in_one() {
     local auth_type=$1
 
+    # Setup components
     if [ "$auth_type" = "full" ]; then
         setup_caddy_all_in_one_full_auth
     else
@@ -6605,8 +6886,12 @@ display_results_all_in_one() {
 
 collect_selfsteal_domain_for_all_in_one() {
     while true; do
+        # 3 - true show_warning
+        # 4 - false allow_cf_proxy
+        # 5 - false expect_different_ip
         SELF_STEAL_DOMAIN=$(prompt_domain "$(t domain_selfsteal_prompt)" "$ORANGE" true false false)
 
+        # Check that selfsteal domain is different from panel and subscription domains
         if check_domain_uniqueness "$SELF_STEAL_DOMAIN" "selfsteal" "$PANEL_DOMAIN" "$SUB_DOMAIN"; then
             break
         fi
@@ -6651,6 +6936,7 @@ install_remnawave_all_in_one() {
     register_panel_user
     configure_vless_all_in_one
 
+    # Create API token and setup subscription page
     SUBSCRIPTION_API_TOKEN=$(create_api_token "127.0.0.1:3000" "$REG_TOKEN" "$PANEL_DOMAIN")
     if [ -z "$SUBSCRIPTION_API_TOKEN" ]; then
         show_error "$(t api_failed_create_token)"
@@ -6715,6 +7001,7 @@ build_main_menu() {
     MENU_ACTIONS[$n]="logs"
     ((n++))
 
+    # Show emergency panel access only for all-in-one installation
     if is_all_in_one_installation; then
         MENU_ITEMS+=("$n:$(t main_menu_panel_access)")
         MENU_ACTIONS[$n]="panel_access"

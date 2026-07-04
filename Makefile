@@ -71,15 +71,18 @@ build: $(BUILD_DIR)
 	@echo '# Remnawave Installer ' >> $(BUILD_DIR)/$(TARGET)
 	@echo '' >> $(BUILD_DIR)/$(TARGET)
 
-	@# Add module contents, removing shebang from each file
+	@# Add module contents, removing shebang from each file.
+	@# NOTE: comment stripping removes lines starting with '#' in column 0 only.
+	@# Heredoc content lines must never start with '#' in column 0 (CSS #id,
+	@# Caddyfile/YAML comments, etc.) or they will be silently dropped from the build.
 	@for module in $(MODULES); do \
 		echo "# Including module: $$(basename $$module)" >> $(BUILD_DIR)/$(TARGET); \
-		tail -n +2 $$module | grep -v '^[[:space:]]*#' >> $(BUILD_DIR)/$(TARGET); \
+		tail -n +2 $$module | grep -v '^#' >> $(BUILD_DIR)/$(TARGET); \
 		echo '' >> $(BUILD_DIR)/$(TARGET); \
 	done
 
 	@# Add main.sh
-	@tail -n +2 $(SRC_DIR)/main.sh | grep -v '^[[:space:]]*#' >> $(BUILD_DIR)/$(TARGET)
+	@tail -n +2 $(SRC_DIR)/main.sh | grep -v '^#' >> $(BUILD_DIR)/$(TARGET)
 
 	@# Make script executable
 	@chmod +x $(BUILD_DIR)/$(TARGET)

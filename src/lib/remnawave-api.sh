@@ -414,7 +414,7 @@ EOF
 
     # Make request with status code check
     {
-        local host_only=$(echo "http://$panel_url/api/users" | sed 's|http://||' | cut -d'/' -f1)
+        local host_only=$(echo "http://$panel_url/api/users" | sed 's|http://||' | cut -d'/' -f1 | cut -d':' -f1)
 
         local headers=(
             -H "Content-Type: application/json"
