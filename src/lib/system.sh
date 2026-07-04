@@ -14,8 +14,14 @@ install_dependencies() {
     # --- 1. Определяем дистрибутив ---
     if ! command -v lsb_release &>/dev/null; then
         show_info "Installing lsb-release..."
-        sudo apt-get update -qq
-        sudo apt-get install -y --no-install-recommends lsb-release
+        sudo apt-get update -qq || {
+            show_error "$(t apt_cache_update_failed)"
+            return 1
+        }
+        sudo apt-get install -y --no-install-recommends lsb-release || {
+            show_error "$(t package_install_failed) lsb-release"
+            return 1
+        }
     fi
     local distro
     distro=$(lsb_release -si | tr '[:upper:]' '[:lower:]')
@@ -41,6 +47,7 @@ install_dependencies() {
         )
         sudo apt-get remove -y --purge "${bad_pkgs[@]}" || true
         sudo apt-get autoremove -y || true
+        sudo rm -f /etc/apt/sources.list.d/docker.list
 
         show_success "$(t old_docker_removed)"
     fi
@@ -51,7 +58,10 @@ install_dependencies() {
     done
 
     show_info "$(t spinner_updating_apt_cache)"
-    sudo apt-get update
+    sudo apt-get update || {
+        show_error "$(t apt_cache_update_failed)"
+        return 1
+    }
 
     local missing=()
     for pkg in "${base_deps[@]}"; do
@@ -61,7 +71,10 @@ install_dependencies() {
     if ((${#missing[@]})); then
         local missing_str="${missing[*]}"
         show_info "$(t spinner_installing_packages) $missing_str"
-        sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get -y install --no-install-recommends "${missing[@]}"
+        sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get -y install --no-install-recommends "${missing[@]}" || {
+            show_error "$(t package_install_failed) $missing_str"
+            return 1
+        }
         show_success "$(t spinner_installing_packages) $missing_str"
     else
         show_info "$(t packages_already_installed)"
@@ -69,27 +82,68 @@ install_dependencies() {
 
     if ! $docker_ready; then
         show_info "$(t installing_docker)"
-        sudo install -m 0755 -d /etc/apt/keyrings
-        curl -fsSL "https://download.docker.com/linux/${distro}/gpg" | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-        sudo chmod a+r /etc/apt/keyrings/docker.gpg
+        sudo install -m 0755 -d /etc/apt/keyrings || {
+            show_error "$(t docker_repo_setup_failed)"
+            return 1
+        }
 
-        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/${distro} ${codename} stable" | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
+        local docker_gpg_tmp
+        docker_gpg_tmp=$(mktemp) || {
+            show_error "$(t docker_repo_setup_failed)"
+            return 1
+        }
+        if ! curl -fsSL "https://download.docker.com/linux/${distro}/gpg" -o "$docker_gpg_tmp"; then
+            rm -f "$docker_gpg_tmp"
+            show_error "$(t docker_gpg_key_download_failed)"
+            return 1
+        fi
+        if ! sudo gpg --dearmor --yes -o /etc/apt/keyrings/docker.gpg "$docker_gpg_tmp"; then
+            rm -f "$docker_gpg_tmp"
+            show_error "$(t docker_repo_setup_failed)"
+            return 1
+        fi
+        rm -f "$docker_gpg_tmp"
+        sudo chmod a+r /etc/apt/keyrings/docker.gpg || {
+            show_error "$(t docker_repo_setup_failed)"
+            return 1
+        }
+
+        if ! echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/${distro} ${codename} stable" | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null; then
+            show_error "$(t docker_repo_setup_failed)"
+            return 1
+        fi
 
         show_info "$(t spinner_updating_apt_cache)"
-        sudo apt-get update
+        sudo apt-get update || {
+            show_error "$(t apt_cache_update_failed)"
+            return 1
+        }
 
         local docker_pkgs=(docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin)
         show_info "$(t spinner_installing_packages) ${docker_pkgs[*]}"
-        sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get -y install "${docker_pkgs[@]}"
+        sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get -y install "${docker_pkgs[@]}" || {
+            show_error "$(t docker_install_failed)"
+            return 1
+        }
         show_success "$(t docker_installed)"
     fi
 
     if ! systemctl is-active --quiet docker; then
-        (sudo systemctl enable --now docker >/dev/null 2>&1) &
-        spinner $! "$(t spinner_starting_docker)"
+        sudo systemctl enable --now docker >/dev/null 2>&1 &
+        local docker_start_pid=$!
+        spinner "$docker_start_pid" "$(t spinner_starting_docker)"
+        if ! wait "$docker_start_pid"; then
+            show_error "$(t docker_service_start_failed)"
+            return 1
+        fi
     else
         (sleep 0.2) &
         spinner $! "$(t spinner_docker_already_running)"
+    fi
+
+    if ! command -v docker &>/dev/null || ! docker compose version &>/dev/null || ! docker info &>/dev/null; then
+        show_error "$(t docker_verify_failed)"
+        return 1
     fi
 
     if dpkg -s ufw &>/dev/null; then
