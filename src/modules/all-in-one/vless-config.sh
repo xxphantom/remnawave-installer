@@ -77,7 +77,7 @@ configure_vless_all_in_one() {
     fi
 
     # Create default user
-    if ! create_user "$panel_url" "$REG_TOKEN" "$PANEL_DOMAIN" "remnawave" "$inbound_uuid" "$squad_uuid"; then
+    if ! create_user "$panel_url" "$REG_TOKEN" "$PANEL_DOMAIN" "remnawave" "$squad_uuid"; then
         return 1
     fi
 }

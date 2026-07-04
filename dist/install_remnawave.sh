@@ -331,7 +331,6 @@ TRANSLATIONS_EN[spinner_updating_xray]="Updating Xray configuration..."
 TRANSLATIONS_EN[spinner_registering_user]="Registering user"
 TRANSLATIONS_EN[spinner_getting_public_key]="Getting public key..."
 TRANSLATIONS_EN[spinner_creating_node]="Creating node..."
-TRANSLATIONS_EN[spinner_getting_inbounds]="Getting list of inbounds..."
 TRANSLATIONS_EN[spinner_creating_config_profile]="Creating configuration profile..."
 TRANSLATIONS_EN[spinner_getting_config_profiles]="Getting configuration profiles..."
 TRANSLATIONS_EN[spinner_deleting_config_profile]="Deleting default configuration profile..."
@@ -398,8 +397,6 @@ TRANSLATIONS_EN[api_failed_get_public_key]="Error: Failed to get public key."
 TRANSLATIONS_EN[api_failed_extract_public_key]="Error: Failed to extract public key from response."
 TRANSLATIONS_EN[api_empty_response_creating_node]="Error: Empty response from server when creating node."
 TRANSLATIONS_EN[api_failed_create_node]="Error: Failed to create node, response:"
-TRANSLATIONS_EN[api_empty_response_getting_inbounds]="Error: Empty response from server when getting inbounds."
-TRANSLATIONS_EN[api_failed_extract_uuid]="Error: Failed to extract UUID from response."
 TRANSLATIONS_EN[api_empty_response_creating_profile]="Error: Empty response from server when creating config profile."
 TRANSLATIONS_EN[api_failed_create_profile]="Error: Failed to create config profile."
 TRANSLATIONS_EN[api_empty_response_getting_profiles]="Error: Empty response from server when getting config profiles."
@@ -809,7 +806,6 @@ TRANSLATIONS_RU[spinner_updating_xray]="Обновление конфигура�
 TRANSLATIONS_RU[spinner_registering_user]="Регистрация пользователя"
 TRANSLATIONS_RU[spinner_getting_public_key]="Получение публичного ключа..."
 TRANSLATIONS_RU[spinner_creating_node]="Создание ноды..."
-TRANSLATIONS_RU[spinner_getting_inbounds]="Получение списка входящих соединений..."
 TRANSLATIONS_RU[spinner_creating_config_profile]="Создание профиля конфигурации..."
 TRANSLATIONS_RU[spinner_getting_config_profiles]="Получение профилей конфигурации..."
 TRANSLATIONS_RU[spinner_deleting_config_profile]="Удаление профиля конфигурации по умолчанию..."
@@ -876,8 +872,6 @@ TRANSLATIONS_RU[api_failed_get_public_key]="Ошибка: Не удалось п
 TRANSLATIONS_RU[api_failed_extract_public_key]="Ошибка: Не удалось извлечь публичный ключ из ответа."
 TRANSLATIONS_RU[api_empty_response_creating_node]="Ошибка: Пустой ответ от сервера при создании ноды."
 TRANSLATIONS_RU[api_failed_create_node]="Ошибка: Не удалось создать ноду, ответ:"
-TRANSLATIONS_RU[api_empty_response_getting_inbounds]="Ошибка: Пустой ответ от сервера при получении входящих соединений."
-TRANSLATIONS_RU[api_failed_extract_uuid]="Ошибка: Не удалось извлечь UUID из ответа."
 TRANSLATIONS_RU[api_empty_response_creating_profile]="Ошибка: Пустой ответ от сервера при создании профиля конфигурации."
 TRANSLATIONS_RU[api_failed_create_profile]="Ошибка: Не удалось создать профиль конфигурации."
 TRANSLATIONS_RU[api_empty_response_getting_profiles]="Ошибка: Пустой ответ от сервера при получении профилей конфигурации."
@@ -2249,7 +2243,7 @@ get_public_key() {
         return 1
     fi
 
-    local pubkey=$(echo "$api_response" | jq -r '.response.pubKey')
+    local pubkey=$(echo "$api_response" | jq -r '.response.secretKey // .response.pubKey // empty')
     if [ -z "$pubkey" ]; then
         echo -e "${BOLD_RED}$(t api_failed_extract_public_key)${NC}"
         return 1
@@ -2286,7 +2280,6 @@ create_node() {
     "trafficLimitBytes": 0,
     "notifyPercent": 0,
     "trafficResetDay": 31,
-    "excludedInbounds": [],
     "countryCode": "XX",
     "consumptionMultiplier": 1.0
 }
@@ -2477,32 +2470,6 @@ update_squad() {
     fi
 }
 
-get_inbounds() {
-    local panel_url="$1"
-    local token="$2"
-    local panel_domain="$3"
-
-    local temp_file=$(mktemp)
-
-    make_api_request "GET" "http://$panel_url/api/inbounds" "$token" "$panel_domain" "" >"$temp_file" 2>&1 &
-    spinner $! "$(t spinner_getting_inbounds)"
-    inbounds_response=$(cat "$temp_file")
-    rm -f "$temp_file"
-
-    if [ -z "$inbounds_response" ]; then
-        echo -e "${BOLD_RED}$(t api_empty_response_getting_inbounds)${NC}"
-        return 1
-    fi
-
-    local inbound_uuid=$(echo "$inbounds_response" | jq -r '.response[0].uuid')
-    if [ -z "$inbound_uuid" ]; then
-        echo -e "${BOLD_RED}$(t api_failed_extract_uuid)${NC}"
-        return 1
-    fi
-
-    echo "$inbound_uuid"
-}
-
 get_nodes() {
     local panel_url="$1"
     local token="$2"
@@ -2548,7 +2515,6 @@ create_host() {
     "host": "",
     "alpn": null,
     "fingerprint": "chrome",
-    "allowInsecure": false,
     "isDisabled": false,
     "securityLayer": "DEFAULT"
 }
@@ -2578,8 +2544,7 @@ create_user() {
     local token="$2"
     local panel_domain="$3"
     local username="$4"
-    local inbound_uuid="$5"
-    local squad_uuid="$6"
+    local squad_uuid="$5"
 
     local temp_file=$(mktemp)
     local temp_headers=$(mktemp)
@@ -2591,9 +2556,6 @@ create_user() {
     "status": "ACTIVE",
     "trafficLimitBytes": 0,
     "trafficLimitStrategy": "NO_RESET",
-    "activeUserInbounds": [
-        "$inbound_uuid"
-    ],
     "activeInternalSquads": [
         "$squad_uuid"
     ],
@@ -5365,7 +5327,7 @@ configure_vless_panel_only() {
         return 1
     fi
 
-    if ! create_user "$panel_url" "$REG_TOKEN" "$PANEL_DOMAIN" "remnawave" "$inbound_uuid" "$squad_uuid"; then
+    if ! create_user "$panel_url" "$REG_TOKEN" "$PANEL_DOMAIN" "remnawave" "$squad_uuid"; then
         return 1
     fi
 
@@ -6183,7 +6145,7 @@ configure_vless_all_in_one() {
         return 1
     fi
 
-    if ! create_user "$panel_url" "$REG_TOKEN" "$PANEL_DOMAIN" "remnawave" "$inbound_uuid" "$squad_uuid"; then
+    if ! create_user "$panel_url" "$REG_TOKEN" "$PANEL_DOMAIN" "remnawave" "$squad_uuid"; then
         return 1
     fi
 }

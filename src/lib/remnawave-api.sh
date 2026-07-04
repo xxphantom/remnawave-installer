@@ -70,7 +70,8 @@ get_public_key() {
         return 1
     fi
 
-    local pubkey=$(echo "$api_response" | jq -r '.response.pubKey')
+    # 2.9.0 renames the response field pubKey -> secretKey; support both
+    local pubkey=$(echo "$api_response" | jq -r '.response.secretKey // .response.pubKey // empty')
     if [ -z "$pubkey" ]; then
         echo -e "${BOLD_RED}$(t api_failed_extract_public_key)${NC}"
         return 1
@@ -109,7 +110,6 @@ create_node() {
     "trafficLimitBytes": 0,
     "notifyPercent": 0,
     "trafficResetDay": 31,
-    "excludedInbounds": [],
     "countryCode": "XX",
     "consumptionMultiplier": 1.0
 }
@@ -313,34 +313,6 @@ update_squad() {
     fi
 }
 
-# Get list of inbounds
-get_inbounds() {
-    local panel_url="$1"
-    local token="$2"
-    local panel_domain="$3"
-
-    local temp_file=$(mktemp)
-
-    make_api_request "GET" "http://$panel_url/api/inbounds" "$token" "$panel_domain" "" >"$temp_file" 2>&1 &
-    spinner $! "$(t spinner_getting_inbounds)"
-    inbounds_response=$(cat "$temp_file")
-    rm -f "$temp_file"
-
-    if [ -z "$inbounds_response" ]; then
-        echo -e "${BOLD_RED}$(t api_empty_response_getting_inbounds)${NC}"
-        return 1
-    fi
-
-    local inbound_uuid=$(echo "$inbounds_response" | jq -r '.response[0].uuid')
-    if [ -z "$inbound_uuid" ]; then
-        echo -e "${BOLD_RED}$(t api_failed_extract_uuid)${NC}"
-        return 1
-    fi
-
-    # Return UUID
-    echo "$inbound_uuid"
-}
-
 # Get list of nodes
 get_nodes() {
     local panel_url="$1"
@@ -388,7 +360,6 @@ create_host() {
     "host": "",
     "alpn": null,
     "fingerprint": "chrome",
-    "allowInsecure": false,
     "isDisabled": false,
     "securityLayer": "DEFAULT"
 }
@@ -419,8 +390,7 @@ create_user() {
     local token="$2"
     local panel_domain="$3"
     local username="$4"
-    local inbound_uuid="$5"
-    local squad_uuid="$6"
+    local squad_uuid="$5"
 
     local temp_file=$(mktemp)
     local temp_headers=$(mktemp)
@@ -432,9 +402,6 @@ create_user() {
     "status": "ACTIVE",
     "trafficLimitBytes": 0,
     "trafficLimitStrategy": "NO_RESET",
-    "activeUserInbounds": [
-        "$inbound_uuid"
-    ],
     "activeInternalSquads": [
         "$squad_uuid"
     ],
