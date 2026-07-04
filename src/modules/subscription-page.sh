@@ -19,9 +19,7 @@ services:
             - REMNAWAVE_PANEL_URL=http://remnawave:3000
             - REMNAWAVE_API_TOKEN=$api_token
             - APP_PORT=3010
-            - SUBSCRIPTION_UI_DISPLAY_RAW_KEYS=true
-            - META_TITLE="Subscription page"
-            - META_DESCRIPTION="Subscription page description"
+            - TRUST_PROXY=1
         ports:
             - '127.0.0.1:3010:3010'
         networks:

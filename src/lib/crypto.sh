@@ -122,7 +122,8 @@ generate_secrets() {
     JWT_AUTH_SECRET=$(openssl rand -hex 32 | tr -d '\n')
     JWT_API_TOKENS_SECRET=$(openssl rand -hex 32 | tr -d '\n')
     DB_USER="remnawave_$(openssl rand -hex 4 | tr -d '\n')"
-    DB_PASSWORD=$(generate_secure_password 16)
+    # Hex only: the password is embedded in DATABASE_URL and must stay URI-safe
+    DB_PASSWORD=$(openssl rand -hex 24 | tr -d '\n')
     DB_NAME="remnawave_db"
     METRICS_PASS=$(generate_secure_password 16)
     SUPERADMIN_USERNAME=$(generate_readable_login)

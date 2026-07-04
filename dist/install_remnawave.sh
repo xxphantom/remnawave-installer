@@ -2127,7 +2127,7 @@ generate_secrets() {
     JWT_AUTH_SECRET=$(openssl rand -hex 32 | tr -d '\n')
     JWT_API_TOKENS_SECRET=$(openssl rand -hex 32 | tr -d '\n')
     DB_USER="remnawave_$(openssl rand -hex 4 | tr -d '\n')"
-    DB_PASSWORD=$(generate_secure_password 16)
+    DB_PASSWORD=$(openssl rand -hex 24 | tr -d '\n')
     DB_NAME="remnawave_db"
     METRICS_PASS=$(generate_secure_password 16)
     SUPERADMIN_USERNAME=$(generate_readable_login)
@@ -5243,9 +5243,7 @@ services:
             - REMNAWAVE_PANEL_URL=http://remnawave:3000
             - REMNAWAVE_API_TOKEN=$api_token
             - APP_PORT=3010
-            - SUBSCRIPTION_UI_DISPLAY_RAW_KEYS=true
-            - META_TITLE="Subscription page"
-            - META_DESCRIPTION="Subscription page description"
+            - TRUST_PROXY=1
         ports:
             - '127.0.0.1:3010:3010'
         networks:
