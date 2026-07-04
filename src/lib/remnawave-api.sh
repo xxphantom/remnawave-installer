@@ -549,7 +549,7 @@ create_api_token() {
     local token_name="${4:-subscription-page-token}"
 
     local temp_file=$(mktemp)
-    local token_data='{"tokenName":"'"$token_name"'"}'
+    local token_data='{"name":"'"$token_name"'","expiresInDays":3650}'
 
     make_api_request "POST" "http://$panel_url/api/tokens" "$token" "$panel_domain" "$token_data" >"$temp_file" 2>&1 &
     spinner $! "$(t spinner_creating_api_token)"
