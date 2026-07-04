@@ -3035,7 +3035,7 @@ services:
     logging:
       driver: 'json-file'
       options:
-        max-size: '30m'
+        max-size: '100m'
         max-file: '5'
 
   remnawave:
@@ -3070,7 +3070,7 @@ services:
     logging:
       driver: 'json-file'
       options:
-        max-size: '30m'
+        max-size: '100m'
         max-file: '5'
 
   remnawave-redis:
@@ -3103,7 +3103,7 @@ services:
     logging:
       driver: 'json-file'
       options:
-        max-size: '30m'
+        max-size: '100m'
         max-file: '5'
 
 networks:
@@ -5487,7 +5487,7 @@ services:
         logging:
             driver: 'json-file'
             options:
-                max-size: '30m'
+                max-size: '100m'
                 max-file: '5'
 
 networks:
@@ -5620,7 +5620,7 @@ services:
     logging:
       driver: 'json-file'
       options:
-        max-size: '30m'
+        max-size: '100m'
         max-file: '5'
 
 volumes:
@@ -5828,7 +5828,7 @@ services:
         logging:
             driver: 'json-file'
             options:
-                max-size: '30m'
+                max-size: '100m'
                 max-file: '5'
 
 volumes:
@@ -6082,7 +6082,7 @@ services:
         logging:
             driver: 'json-file'
             options:
-                max-size: '30m'
+                max-size: '100m'
                 max-file: '5'
 
 volumes:
@@ -6117,7 +6117,7 @@ services:
         logging:
             driver: 'json-file'
             options:
-                max-size: '30m'
+                max-size: '100m'
                 max-file: '5'
 
 volumes:
@@ -6225,7 +6225,7 @@ services:
         logging:
             driver: 'json-file'
             options:
-                max-size: '30m'
+                max-size: '100m'
                 max-file: '5'
 EOF
 
@@ -6472,7 +6472,7 @@ services:
         logging:
             driver: 'json-file'
             options:
-                max-size: '30m'
+                max-size: '100m'
                 max-file: '5'
 EOF
 
@@ -6622,7 +6622,7 @@ services:
         logging:
             driver: 'json-file'
             options:
-                max-size: '30m'
+                max-size: '100m'
                 max-file: '5'
 
 volumes:
@@ -6817,7 +6817,7 @@ services:
         logging:
             driver: 'json-file'
             options:
-                max-size: '30m'
+                max-size: '100m'
                 max-file: '5'
 
 volumes:
