@@ -83,6 +83,9 @@ INSTALLER_REPO="https://raw.githubusercontent.com/xxphantom/remnawave-installer/
 # Main directories
 REMNAWAVE_DIR="/opt/remnawave"
 REMNANODE_DIR="/opt/remnanode"
+# docs.rw path; installs before v2.2 used /opt/remnawave/subscription-page
+SUBSCRIPTION_PAGE_DIR="$REMNAWAVE_DIR/subscription"
+LEGACY_SUBSCRIPTION_PAGE_DIR="$REMNAWAVE_DIR/subscription-page"
 
 CADDY_SOCKET_PATH="/dev/shm/caddy.sock"
 SELFSTEAL_PORT="9443"

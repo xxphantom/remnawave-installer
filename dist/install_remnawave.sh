@@ -80,6 +80,8 @@ INSTALLER_REPO="https://raw.githubusercontent.com/xxphantom/remnawave-installer/
 
 REMNAWAVE_DIR="/opt/remnawave"
 REMNANODE_DIR="/opt/remnanode"
+SUBSCRIPTION_PAGE_DIR="$REMNAWAVE_DIR/subscription"
+LEGACY_SUBSCRIPTION_PAGE_DIR="$REMNAWAVE_DIR/subscription-page"
 
 CADDY_SOCKET_PATH="/dev/shm/caddy.sock"
 SELFSTEAL_PORT="9443"
@@ -1260,6 +1262,16 @@ prepare_node_installation() {
 # Including module: containers.sh
 
 
+get_subscription_page_dir() {
+    if [ -f "$SUBSCRIPTION_PAGE_DIR/docker-compose.yml" ]; then
+        echo "$SUBSCRIPTION_PAGE_DIR"
+    elif [ -f "$LEGACY_SUBSCRIPTION_PAGE_DIR/docker-compose.yml" ]; then
+        echo "$LEGACY_SUBSCRIPTION_PAGE_DIR"
+    else
+        echo "$SUBSCRIPTION_PAGE_DIR"
+    fi
+}
+
 wait_for_caddy_socket() {
     local max_wait=${1:-30}
     local elapsed=0
@@ -1307,7 +1319,8 @@ remove_previous_installation() {
         local compose_configs=(
             "$REMNAWAVE_DIR/caddy/docker-compose.yml"
             "$LOCAL_REMNANODE_DIR/docker-compose.yml"
-            "$REMNAWAVE_DIR/subscription-page/docker-compose.yml"
+            "$SUBSCRIPTION_PAGE_DIR/docker-compose.yml"
+            "$LEGACY_SUBSCRIPTION_PAGE_DIR/docker-compose.yml" # Old path - for backward compatibility
             "$REMNAWAVE_DIR/docker-compose.yml"
             "$REMNANODE_DIR/docker-compose.yml"
             "$SELFSTEAL_DIR/docker-compose.yml"
@@ -1384,17 +1397,18 @@ restart_panel() {
             show_error "$(t restart_compose_not_found)"
             show_error "$(t restart_installation_corrupted)"
         else
-            # Variable to track subscription-page directory existence
+            # Variable to track subscription page directory existence
+            local sub_page_dir=$(get_subscription_page_dir)
             SUBSCRIPTION_PAGE_EXISTS=false
 
-            # Check for subscription-page directory
-            if [ -d /opt/remnawave/subscription-page ] && [ -f /opt/remnawave/subscription-page/docker-compose.yml ]; then
+            # Check for subscription page directory
+            if [ -f "$sub_page_dir/docker-compose.yml" ]; then
                 SUBSCRIPTION_PAGE_EXISTS=true
             fi
 
             # Stop subscription page if it exists
             if [ "$SUBSCRIPTION_PAGE_EXISTS" = true ]; then
-                cd /opt/remnawave/subscription-page && docker compose down >/dev/null 2>&1 &
+                cd "$sub_page_dir" && docker compose down >/dev/null 2>&1 &
                 spinner $! "$(t spinner_stopping_subscription)"
             fi
 
@@ -1411,7 +1425,7 @@ restart_panel() {
             # Start subscription page if it exists
             if [ "$SUBSCRIPTION_PAGE_EXISTS" = true ]; then
                 show_info "$(t restart_starting_subscription)" "$ORANGE"
-                if ! start_container "/opt/remnawave/subscription-page" "Subscription Page"; then
+                if ! start_container "$sub_page_dir" "Subscription Page"; then
                     return 1
                 fi
             fi
@@ -1540,7 +1554,7 @@ start_panel() {
 }
 
 start_subscription_page() {
-    if ! start_container "$REMNAWAVE_DIR/subscription-page" "Subscription page"; then
+    if ! start_container "$SUBSCRIPTION_PAGE_DIR" "Subscription page"; then
         show_info "$(t services_installation_stopped)" "$BOLD_RED"
         exit 1
     fi
@@ -4374,9 +4388,10 @@ update_panel_only() {
         fi
     fi
     
-    # Check if subscription page exists
+    # Check if subscription page exists (new or legacy path)
+    local sub_page_dir=$(get_subscription_page_dir)
     SUBSCRIPTION_PAGE_EXISTS=false
-    if [ -d /opt/remnawave/subscription-page ] && [ -f /opt/remnawave/subscription-page/docker-compose.yml ]; then
+    if [ -f "$sub_page_dir/docker-compose.yml" ]; then
         SUBSCRIPTION_PAGE_EXISTS=true
     fi
 
@@ -4413,7 +4428,7 @@ update_panel_only() {
     # Check subscription page updates if exists
     if [ "$SUBSCRIPTION_PAGE_EXISTS" = true ]; then
         local subscription_result=""
-        check_images_updated "/opt/remnawave/subscription-page" subscription_result &
+        check_images_updated "$sub_page_dir" subscription_result &
         local check_pid=$!
         spinner $check_pid "$(t update_checking_images)"
         wait $check_pid
@@ -4477,7 +4492,7 @@ update_panel_only() {
 
     # Recreate subscription page if it was updated
     if [ "$SUBSCRIPTION_PAGE_EXISTS" = true ] && [ "$subscription_updated" = true ]; then
-        cd /opt/remnawave/subscription-page && docker compose up -d --remove-orphans --force-recreate >/dev/null 2>&1 &
+        cd "$sub_page_dir" && docker compose up -d --remove-orphans --force-recreate >/dev/null 2>&1 &
         spinner $! "$(t update_starting_services)"
         if [ $? -ne 0 ]; then
             show_error "Failed to recreate subscription page services"
@@ -5483,9 +5498,9 @@ create_static_site() {
 setup_remnawave-subscription-page() {
     local api_token="$1"
 
-    mkdir -p $REMNAWAVE_DIR/subscription-page
+    mkdir -p "$SUBSCRIPTION_PAGE_DIR"
 
-    cd $REMNAWAVE_DIR/subscription-page
+    cd "$SUBSCRIPTION_PAGE_DIR"
 
     cat >docker-compose.yml <<EOF
 services:
@@ -5515,7 +5530,7 @@ networks:
         external: true
 EOF
 
-    create_makefile "$REMNAWAVE_DIR/subscription-page"
+    create_makefile "$SUBSCRIPTION_PAGE_DIR"
 }
 
 # Including module: vless-config.sh

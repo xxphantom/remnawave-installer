@@ -4,9 +4,9 @@
 setup_remnawave-subscription-page() {
     local api_token="$1"
 
-    mkdir -p $REMNAWAVE_DIR/subscription-page
+    mkdir -p "$SUBSCRIPTION_PAGE_DIR"
 
-    cd $REMNAWAVE_DIR/subscription-page
+    cd "$SUBSCRIPTION_PAGE_DIR"
 
     cat >docker-compose.yml <<EOF
 services:
@@ -36,5 +36,5 @@ networks:
         external: true
 EOF
 
-    create_makefile "$REMNAWAVE_DIR/subscription-page"
+    create_makefile "$SUBSCRIPTION_PAGE_DIR"
 }

@@ -109,9 +109,10 @@ update_panel_only() {
         fi
     fi
     
-    # Check if subscription page exists
+    # Check if subscription page exists (new or legacy path)
+    local sub_page_dir=$(get_subscription_page_dir)
     SUBSCRIPTION_PAGE_EXISTS=false
-    if [ -d /opt/remnawave/subscription-page ] && [ -f /opt/remnawave/subscription-page/docker-compose.yml ]; then
+    if [ -f "$sub_page_dir/docker-compose.yml" ]; then
         SUBSCRIPTION_PAGE_EXISTS=true
     fi
 
@@ -148,7 +149,7 @@ update_panel_only() {
     # Check subscription page updates if exists
     if [ "$SUBSCRIPTION_PAGE_EXISTS" = true ]; then
         local subscription_result=""
-        check_images_updated "/opt/remnawave/subscription-page" subscription_result &
+        check_images_updated "$sub_page_dir" subscription_result &
         local check_pid=$!
         spinner $check_pid "$(t update_checking_images)"
         wait $check_pid
@@ -212,7 +213,7 @@ update_panel_only() {
 
     # Recreate subscription page if it was updated
     if [ "$SUBSCRIPTION_PAGE_EXISTS" = true ] && [ "$subscription_updated" = true ]; then
-        cd /opt/remnawave/subscription-page && docker compose up -d --remove-orphans --force-recreate >/dev/null 2>&1 &
+        cd "$sub_page_dir" && docker compose up -d --remove-orphans --force-recreate >/dev/null 2>&1 &
         spinner $! "$(t update_starting_services)"
         if [ $? -ne 0 ]; then
             show_error "Failed to recreate subscription page services"
