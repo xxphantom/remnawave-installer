@@ -90,7 +90,7 @@ EOF
     cat >docker-compose.yml <<EOF
 services:
     caddy:
-        image: caddy:2.9.1
+        image: caddy:2.11.4
         container_name: caddy-remnawave
         restart: unless-stopped
         command: sh -c 'rm -f /dev/shm/caddy.sock && caddy run --config /etc/caddy/Caddyfile --adapter caddyfile'

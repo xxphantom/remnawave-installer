@@ -212,10 +212,11 @@ setup_panel_docker_compose() {
     cat >>docker-compose.yml <<"EOF"
 services:
   remnawave-db:
-    image: postgres:17.6
+    image: postgres:18.4
     container_name: 'remnawave-db'
     hostname: remnawave-db
     restart: always
+    shm_size: 512mb
     ulimits:
       nofile:
         soft: 1048576
@@ -230,7 +231,7 @@ services:
     ports:
       - '127.0.0.1:6767:5432'
     volumes:
-      - remnawave-db-data:/var/lib/postgresql/data
+      - remnawave-db-data:/var/lib/postgresql
     networks:
       - remnawave-network
     healthcheck:

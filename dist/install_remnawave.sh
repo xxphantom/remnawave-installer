@@ -2879,10 +2879,11 @@ setup_panel_docker_compose() {
     cat >>docker-compose.yml <<"EOF"
 services:
   remnawave-db:
-    image: postgres:17.6
+    image: postgres:18.4
     container_name: 'remnawave-db'
     hostname: remnawave-db
     restart: always
+    shm_size: 512mb
     ulimits:
       nofile:
         soft: 1048576
@@ -2897,7 +2898,7 @@ services:
     ports:
       - '127.0.0.1:6767:5432'
     volumes:
-      - remnawave-db-data:/var/lib/postgresql/data
+      - remnawave-db-data:/var/lib/postgresql
     networks:
       - remnawave-network
     healthcheck:
@@ -5352,7 +5353,7 @@ setup_caddy_for_panel() {
     cat >docker-compose.yml <<EOF
 services:
   caddy:
-    image: caddy:2.9.1
+    image: caddy:2.11.4
     container_name: caddy-remnawave
     restart: unless-stopped
     volumes:
@@ -5800,7 +5801,7 @@ create_docker_compose_socket() {
     cat >docker-compose.yml <<EOF
 services:
     caddy:
-        image: caddy:2.9.1
+        image: caddy:2.11.4
         container_name: caddy-selfsteal
         restart: unless-stopped
         command: sh -c 'rm -f /dev/shm/caddy.sock && caddy run --config /etc/caddy/Caddyfile --adapter caddyfile'
@@ -5837,7 +5838,7 @@ create_docker_compose_port() {
     cat >docker-compose.yml <<EOF
 services:
     caddy:
-        image: caddy:2.9.1
+        image: caddy:2.11.4
         container_name: caddy-selfsteal
         restart: unless-stopped
         environment:
@@ -6312,7 +6313,7 @@ EOF
     cat >docker-compose.yml <<EOF
 services:
     caddy:
-        image: caddy:2.9.1
+        image: caddy:2.11.4
         container_name: caddy-remnawave
         restart: unless-stopped
         command: sh -c 'rm -f /dev/shm/caddy.sock && caddy run --config /etc/caddy/Caddyfile --adapter caddyfile'

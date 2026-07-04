@@ -8,7 +8,7 @@ setup_caddy_for_panel() {
     cat >docker-compose.yml <<EOF
 services:
   caddy:
-    image: caddy:2.9.1
+    image: caddy:2.11.4
     container_name: caddy-remnawave
     restart: unless-stopped
     volumes:
