@@ -61,6 +61,7 @@ services:
             - SECRET_KEY=$certificate
         volumes:
             - /dev/shm:/dev/shm
+            - /var/log/remnanode:/var/log/remnanode
         logging:
             driver: 'json-file'
             options:
@@ -176,6 +177,8 @@ setup_node() {
 
     # Create node docker-compose
     create_node_docker_compose "$CERTIFICATE"
+
+    setup_node_log_rotation
 
     # Setup and start Caddy (in selfsteal.sh) with selected connection type
     setup_selfsteal "$XRAY_CONNECTION_TYPE"

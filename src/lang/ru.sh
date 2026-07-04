@@ -368,6 +368,7 @@ TRANSLATIONS_RU[node_ssl_cert_invalid]="✗ Неверный формат Secret
 TRANSLATIONS_RU[node_ssl_cert_expected]="Ожидаемый формат: eyJub2RlQ2VydFBldW0iOiIuLi4..."
 TRANSLATIONS_RU[node_port_info]="• Порт ноды:"
 TRANSLATIONS_RU[node_directory_info]="• Директория ноды:"
+TRANSLATIONS_RU[node_logrotate_configured]="Настроена ротация логов в /var/log/remnanode (используется при включении файловых логов Xray)"
 
 # Container
 TRANSLATIONS_RU[container_error_provide_args]="Ошибка: укажите директорию и отображаемое имя"

@@ -368,6 +368,7 @@ TRANSLATIONS_EN[node_ssl_cert_invalid]="✗ Invalid Secret Key format. Please tr
 TRANSLATIONS_EN[node_ssl_cert_expected]="Expected format: eyJub2RlQ2VydFBldW0iOiIuLi4..."
 TRANSLATIONS_EN[node_port_info]="• Node port:"
 TRANSLATIONS_EN[node_directory_info]="• Node directory:"
+TRANSLATIONS_EN[node_logrotate_configured]="Log rotation configured for /var/log/remnanode (used when Xray file logs are enabled)"
 
 # Container
 TRANSLATIONS_EN[container_error_provide_args]="Error: provide directory and display name"

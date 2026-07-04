@@ -446,6 +446,7 @@ TRANSLATIONS_EN[node_ssl_cert_invalid]="✗ Invalid Secret Key format. Please tr
 TRANSLATIONS_EN[node_ssl_cert_expected]="Expected format: eyJub2RlQ2VydFBldW0iOiIuLi4..."
 TRANSLATIONS_EN[node_port_info]="• Node port:"
 TRANSLATIONS_EN[node_directory_info]="• Node directory:"
+TRANSLATIONS_EN[node_logrotate_configured]="Log rotation configured for /var/log/remnanode (used when Xray file logs are enabled)"
 
 TRANSLATIONS_EN[container_error_provide_args]="Error: provide directory and display name"
 TRANSLATIONS_EN[container_error_directory_not_found]="Error: directory \"%s\" not found"
@@ -921,6 +922,7 @@ TRANSLATIONS_RU[node_ssl_cert_invalid]="✗ Неверный формат Secret
 TRANSLATIONS_RU[node_ssl_cert_expected]="Ожидаемый формат: eyJub2RlQ2VydFBldW0iOiIuLi4..."
 TRANSLATIONS_RU[node_port_info]="• Порт ноды:"
 TRANSLATIONS_RU[node_directory_info]="• Директория ноды:"
+TRANSLATIONS_RU[node_logrotate_configured]="Настроена ротация логов в /var/log/remnanode (используется при включении файловых логов Xray)"
 
 TRANSLATIONS_RU[container_error_provide_args]="Ошибка: укажите директорию и отображаемое имя"
 TRANSLATIONS_RU[container_error_directory_not_found]="Ошибка: директория \"%s\" не найдена"
@@ -1108,7 +1110,7 @@ install_dependencies() {
         show_success "$(t old_docker_removed)"
     fi
 
-    local base_deps=(ca-certificates curl gnupg jq make dnsutils ufw unattended-upgrades lsb-release coreutils)
+    local base_deps=(ca-certificates curl gnupg jq make dnsutils ufw unattended-upgrades lsb-release coreutils logrotate)
     for pkg in "${extra_deps[@]}"; do
         [[ " ${base_deps[*]} " != *" $pkg "* ]] && base_deps+=("$pkg")
     done
@@ -1206,6 +1208,23 @@ create_dir() {
         mkdir -p "$dir_path"
         show_info "$(t system_created_directory) $dir_path"
     fi
+}
+
+setup_node_log_rotation() {
+    mkdir -p /var/log/remnanode
+
+    cat >/etc/logrotate.d/remnanode <<'EOF'
+/var/log/remnanode/*.log {
+    size 50M
+    rotate 5
+    compress
+    missingok
+    notifempty
+    copytruncate
+}
+EOF
+
+    show_info "$(t node_logrotate_configured)"
 }
 
 prepare_installation() {
@@ -6222,6 +6241,7 @@ services:
             - SECRET_KEY=$certificate
         volumes:
             - /dev/shm:/dev/shm
+            - /var/log/remnanode:/var/log/remnanode
         logging:
             driver: 'json-file'
             options:
@@ -6335,6 +6355,8 @@ setup_node() {
 
     # Create node docker-compose
     create_node_docker_compose "$CERTIFICATE"
+
+    setup_node_log_rotation
 
     # Setup and start Caddy (in selfsteal.sh) with selected connection type
     setup_selfsteal "$XRAY_CONNECTION_TYPE"
@@ -6468,6 +6490,7 @@ services:
             - SECRET_KEY=$pubkey
         volumes:
             - /dev/shm:/dev/shm
+            - /var/log/remnanode:/var/log/remnanode
         network_mode: host
         logging:
             driver: 'json-file'
@@ -6477,6 +6500,8 @@ services:
 EOF
 
     create_makefile "$LOCAL_REMNANODE_DIR"
+
+    setup_node_log_rotation
 }
 
 start_caddy_all_in_one() {

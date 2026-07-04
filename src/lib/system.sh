@@ -45,7 +45,7 @@ install_dependencies() {
         show_success "$(t old_docker_removed)"
     fi
 
-    local base_deps=(ca-certificates curl gnupg jq make dnsutils ufw unattended-upgrades lsb-release coreutils)
+    local base_deps=(ca-certificates curl gnupg jq make dnsutils ufw unattended-upgrades lsb-release coreutils logrotate)
     for pkg in "${extra_deps[@]}"; do
         [[ " ${base_deps[*]} " != *" $pkg "* ]] && base_deps+=("$pkg")
     done
@@ -143,6 +143,25 @@ create_dir() {
         mkdir -p "$dir_path"
         show_info "$(t system_created_directory) $dir_path"
     fi
+}
+
+# Host log directory and rotation for Remnawave Node (docs.rw requires
+# rotation whenever Xray file logs are enabled, or they fill up the disk)
+setup_node_log_rotation() {
+    mkdir -p /var/log/remnanode
+
+    cat >/etc/logrotate.d/remnanode <<'EOF'
+/var/log/remnanode/*.log {
+    size 50M
+    rotate 5
+    compress
+    missingok
+    notifempty
+    copytruncate
+}
+EOF
+
+    show_info "$(t node_logrotate_configured)"
 }
 
 # Common preparation steps for panel installations

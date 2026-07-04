@@ -37,6 +37,7 @@ services:
             - SECRET_KEY=$pubkey
         volumes:
             - /dev/shm:/dev/shm
+            - /var/log/remnanode:/var/log/remnanode
         network_mode: host
         logging:
             driver: 'json-file'
@@ -46,6 +47,8 @@ services:
 EOF
 
     create_makefile "$LOCAL_REMNANODE_DIR"
+
+    setup_node_log_rotation
 }
 
 # Start Caddy container
