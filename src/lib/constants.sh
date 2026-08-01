@@ -56,7 +56,7 @@ YELLOW=$(tput setaf 3)
 NC=$(tput sgr0)
 
 # Script version
-VERSION="2.2.0"
+VERSION="2.3.0"
 
 # Docker image tags based on branch
 # Check if branch is a version number (e.g., 1.65, 2.0.1)
