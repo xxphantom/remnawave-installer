@@ -62,7 +62,7 @@ TRANSLATIONS_RU[success_credentials_saved]="Учетные данные сохр
 TRANSLATIONS_RU[success_installation_complete]="Установка завершена. Нажмите Enter для продолжения..."
 
 # Warning messages
-TRANSLATIONS_RU[warning_skipping_telegram]="Пропускаем интеграцию с Telegram."
+TRANSLATIONS_RU[warning_telegram_token_empty]="Токен бота не введён — уведомления Telegram будут отключены."
 TRANSLATIONS_RU[warning_bbr_not_configured]="BBR не был настроен в /etc/sysctl.conf"
 TRANSLATIONS_RU[warning_enter_different_domain]="Пожалуйста, введите другой домен для"
 
@@ -75,8 +75,7 @@ TRANSLATIONS_RU[bbr_enable]="Включить BBR"
 TRANSLATIONS_RU[bbr_disable]="Отключить BBR"
 
 # Telegram configuration
-TRANSLATIONS_RU[telegram_enable_notifications]="Хотите ли вы включить уведомления Telegram?"
-TRANSLATIONS_RU[telegram_bot_token]="Введите токен вашего Telegram бота: "
+TRANSLATIONS_RU[telegram_bot_token]="Введите токен вашего Telegram бота (нажмите Enter, чтобы пропустить уведомления): "
 TRANSLATIONS_RU[telegram_nodes_chat_id]="Введите ID чата для уведомлений о событиях нод: "
 TRANSLATIONS_RU[telegram_enable_user_notifications]="Хотите ли вы включить уведомления о событиях пользователей?"
 TRANSLATIONS_RU[telegram_users_chat_id]="Введите ID чата для уведомлений о событиях пользователей: "

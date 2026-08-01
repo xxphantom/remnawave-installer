@@ -62,7 +62,7 @@ TRANSLATIONS_EN[success_credentials_saved]="Credentials saved in file:"
 TRANSLATIONS_EN[success_installation_complete]="Installation complete. Press Enter to continue..."
 
 # Warning messages
-TRANSLATIONS_EN[warning_skipping_telegram]="Skipping Telegram integration."
+TRANSLATIONS_EN[warning_telegram_token_empty]="Bot token is empty — Telegram notifications will be disabled."
 TRANSLATIONS_EN[warning_bbr_not_configured]="BBR was not configured in /etc/sysctl.conf"
 TRANSLATIONS_EN[warning_enter_different_domain]="Please enter a different domain for"
 
@@ -75,8 +75,7 @@ TRANSLATIONS_EN[bbr_enable]="Enable BBR"
 TRANSLATIONS_EN[bbr_disable]="Disable BBR"
 
 # Telegram configuration
-TRANSLATIONS_EN[telegram_enable_notifications]="Do you want to enable Telegram notifications?"
-TRANSLATIONS_EN[telegram_bot_token]="Enter your Telegram bot token: "
+TRANSLATIONS_EN[telegram_bot_token]="Enter your Telegram bot token (press Enter to skip notifications): "
 TRANSLATIONS_EN[telegram_nodes_chat_id]="Enter the chat ID for node event notifications: "
 TRANSLATIONS_EN[telegram_enable_user_notifications]="Do you want to enable notifications about user events?"
 TRANSLATIONS_EN[telegram_users_chat_id]="Enter the chat ID for user event notifications: "

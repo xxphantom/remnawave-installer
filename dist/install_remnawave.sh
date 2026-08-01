@@ -170,7 +170,7 @@ TRANSLATIONS_EN[success_bbr_disabled]="BBR disabled, active cubic + fq_codel"
 TRANSLATIONS_EN[success_credentials_saved]="Credentials saved in file:"
 TRANSLATIONS_EN[success_installation_complete]="Installation complete. Press Enter to continue..."
 
-TRANSLATIONS_EN[warning_skipping_telegram]="Skipping Telegram integration."
+TRANSLATIONS_EN[warning_telegram_token_empty]="Bot token is empty — Telegram notifications will be disabled."
 TRANSLATIONS_EN[warning_bbr_not_configured]="BBR was not configured in /etc/sysctl.conf"
 TRANSLATIONS_EN[warning_enter_different_domain]="Please enter a different domain for"
 
@@ -180,8 +180,7 @@ TRANSLATIONS_EN[info_installation_directory]="Installation directory:"
 TRANSLATIONS_EN[bbr_enable]="Enable BBR"
 TRANSLATIONS_EN[bbr_disable]="Disable BBR"
 
-TRANSLATIONS_EN[telegram_enable_notifications]="Do you want to enable Telegram notifications?"
-TRANSLATIONS_EN[telegram_bot_token]="Enter your Telegram bot token: "
+TRANSLATIONS_EN[telegram_bot_token]="Enter your Telegram bot token (press Enter to skip notifications): "
 TRANSLATIONS_EN[telegram_nodes_chat_id]="Enter the chat ID for node event notifications: "
 TRANSLATIONS_EN[telegram_enable_user_notifications]="Do you want to enable notifications about user events?"
 TRANSLATIONS_EN[telegram_users_chat_id]="Enter the chat ID for user event notifications: "
@@ -653,7 +652,7 @@ TRANSLATIONS_RU[success_bbr_disabled]="BBR отключен, активен cubi
 TRANSLATIONS_RU[success_credentials_saved]="Учетные данные сохранены в файле:"
 TRANSLATIONS_RU[success_installation_complete]="Установка завершена. Нажмите Enter для продолжения..."
 
-TRANSLATIONS_RU[warning_skipping_telegram]="Пропускаем интеграцию с Telegram."
+TRANSLATIONS_RU[warning_telegram_token_empty]="Токен бота не введён — уведомления Telegram будут отключены."
 TRANSLATIONS_RU[warning_bbr_not_configured]="BBR не был настроен в /etc/sysctl.conf"
 TRANSLATIONS_RU[warning_enter_different_domain]="Пожалуйста, введите другой домен для"
 
@@ -663,8 +662,7 @@ TRANSLATIONS_RU[info_installation_directory]="Директория устано�
 TRANSLATIONS_RU[bbr_enable]="Включить BBR"
 TRANSLATIONS_RU[bbr_disable]="Отключить BBR"
 
-TRANSLATIONS_RU[telegram_enable_notifications]="Хотите ли вы включить уведомления Telegram?"
-TRANSLATIONS_RU[telegram_bot_token]="Введите токен вашего Telegram бота: "
+TRANSLATIONS_RU[telegram_bot_token]="Введите токен вашего Telegram бота (нажмите Enter, чтобы пропустить уведомления): "
 TRANSLATIONS_RU[telegram_nodes_chat_id]="Введите ID чата для уведомлений о событиях нод: "
 TRANSLATIONS_RU[telegram_enable_user_notifications]="Хотите ли вы включить уведомления о событиях пользователей?"
 TRANSLATIONS_RU[telegram_users_chat_id]="Введите ID чата для уведомлений о событиях пользователей: "
@@ -2990,48 +2988,54 @@ collect_telegram_channel() {
     build_telegram_notify_value "$chat_id" "$thread_id"
 }
 
+reset_telegram_config() {
+    IS_TELEGRAM_NOTIFICATIONS_ENABLED=false
+    TELEGRAM_BOT_TOKEN=""
+    TELEGRAM_NOTIFY_NODES=""
+    TELEGRAM_NOTIFY_USERS=""
+    TELEGRAM_NOTIFY_CRM=""
+    TELEGRAM_NOTIFY_SERVICE=""
+    TELEGRAM_NOTIFY_TBLOCKER=""
+}
+
 collect_telegram_config() {
-    if prompt_yes_no "$(t telegram_enable_notifications)"; then
-        IS_TELEGRAM_NOTIFICATIONS_ENABLED=true
-        TELEGRAM_BOT_TOKEN=$(prompt_input "$(t telegram_bot_token)" "$ORANGE")
+    TELEGRAM_BOT_TOKEN=$(prompt_input "$(t telegram_bot_token)" "$ORANGE")
 
-        TELEGRAM_NOTIFY_NODES=$(collect_telegram_channel "$(t telegram_nodes_chat_id)")
+    if [ -z "$TELEGRAM_BOT_TOKEN" ]; then
+        show_warning "$(t warning_telegram_token_empty)"
+        reset_telegram_config
+        return
+    fi
 
-        # Ask about user notifications (optional)
-        if prompt_yes_no "$(t telegram_enable_user_notifications)"; then
-            TELEGRAM_NOTIFY_USERS=$(collect_telegram_channel "$(t telegram_users_chat_id)")
-        else
-            TELEGRAM_NOTIFY_USERS=""
-        fi
+    IS_TELEGRAM_NOTIFICATIONS_ENABLED=true
 
-        # Ask about CRM notifications (optional)
-        if prompt_yes_no "$(t telegram_enable_crm_notifications)"; then
-            TELEGRAM_NOTIFY_CRM=$(collect_telegram_channel "$(t telegram_crm_chat_id)")
-        else
-            TELEGRAM_NOTIFY_CRM=""
-        fi
+    TELEGRAM_NOTIFY_NODES=$(collect_telegram_channel "$(t telegram_nodes_chat_id)")
 
-        # Ask about service notifications (optional)
-        if prompt_yes_no "$(t telegram_enable_service_notifications)"; then
-            TELEGRAM_NOTIFY_SERVICE=$(collect_telegram_channel "$(t telegram_service_chat_id)")
-        else
-            TELEGRAM_NOTIFY_SERVICE=""
-        fi
-
-        # Ask about TBLOCKER notifications (optional)
-        if prompt_yes_no "$(t telegram_enable_tblocker_notifications)"; then
-            TELEGRAM_NOTIFY_TBLOCKER=$(collect_telegram_channel "$(t telegram_tblocker_chat_id)")
-        else
-            TELEGRAM_NOTIFY_TBLOCKER=""
-        fi
+    # Ask about user notifications (optional)
+    if prompt_yes_no "$(t telegram_enable_user_notifications)"; then
+        TELEGRAM_NOTIFY_USERS=$(collect_telegram_channel "$(t telegram_users_chat_id)")
     else
-        show_warning "$(t warning_skipping_telegram)"
-        IS_TELEGRAM_NOTIFICATIONS_ENABLED=false
-        TELEGRAM_BOT_TOKEN=""
-        TELEGRAM_NOTIFY_NODES=""
         TELEGRAM_NOTIFY_USERS=""
+    fi
+
+    # Ask about CRM notifications (optional)
+    if prompt_yes_no "$(t telegram_enable_crm_notifications)"; then
+        TELEGRAM_NOTIFY_CRM=$(collect_telegram_channel "$(t telegram_crm_chat_id)")
+    else
         TELEGRAM_NOTIFY_CRM=""
+    fi
+
+    # Ask about service notifications (optional)
+    if prompt_yes_no "$(t telegram_enable_service_notifications)"; then
+        TELEGRAM_NOTIFY_SERVICE=$(collect_telegram_channel "$(t telegram_service_chat_id)")
+    else
         TELEGRAM_NOTIFY_SERVICE=""
+    fi
+
+    # Ask about TBLOCKER notifications (optional)
+    if prompt_yes_no "$(t telegram_enable_tblocker_notifications)"; then
+        TELEGRAM_NOTIFY_TBLOCKER=$(collect_telegram_channel "$(t telegram_tblocker_chat_id)")
+    else
         TELEGRAM_NOTIFY_TBLOCKER=""
     fi
 }

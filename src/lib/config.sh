@@ -92,49 +92,56 @@ collect_telegram_channel() {
     build_telegram_notify_value "$chat_id" "$thread_id"
 }
 
+# Reset all Telegram-related variables to disabled state
+reset_telegram_config() {
+    IS_TELEGRAM_NOTIFICATIONS_ENABLED=false
+    TELEGRAM_BOT_TOKEN=""
+    TELEGRAM_NOTIFY_NODES=""
+    TELEGRAM_NOTIFY_USERS=""
+    TELEGRAM_NOTIFY_CRM=""
+    TELEGRAM_NOTIFY_SERVICE=""
+    TELEGRAM_NOTIFY_TBLOCKER=""
+}
+
 # Collect Telegram configuration
 collect_telegram_config() {
-    if prompt_yes_no "$(t telegram_enable_notifications)"; then
-        IS_TELEGRAM_NOTIFICATIONS_ENABLED=true
-        TELEGRAM_BOT_TOKEN=$(prompt_input "$(t telegram_bot_token)" "$ORANGE")
+    TELEGRAM_BOT_TOKEN=$(prompt_input "$(t telegram_bot_token)" "$ORANGE")
 
-        TELEGRAM_NOTIFY_NODES=$(collect_telegram_channel "$(t telegram_nodes_chat_id)")
+    if [ -z "$TELEGRAM_BOT_TOKEN" ]; then
+        show_warning "$(t warning_telegram_token_empty)"
+        reset_telegram_config
+        return
+    fi
 
-        # Ask about user notifications (optional)
-        if prompt_yes_no "$(t telegram_enable_user_notifications)"; then
-            TELEGRAM_NOTIFY_USERS=$(collect_telegram_channel "$(t telegram_users_chat_id)")
-        else
-            TELEGRAM_NOTIFY_USERS=""
-        fi
+    IS_TELEGRAM_NOTIFICATIONS_ENABLED=true
 
-        # Ask about CRM notifications (optional)
-        if prompt_yes_no "$(t telegram_enable_crm_notifications)"; then
-            TELEGRAM_NOTIFY_CRM=$(collect_telegram_channel "$(t telegram_crm_chat_id)")
-        else
-            TELEGRAM_NOTIFY_CRM=""
-        fi
+    TELEGRAM_NOTIFY_NODES=$(collect_telegram_channel "$(t telegram_nodes_chat_id)")
 
-        # Ask about service notifications (optional)
-        if prompt_yes_no "$(t telegram_enable_service_notifications)"; then
-            TELEGRAM_NOTIFY_SERVICE=$(collect_telegram_channel "$(t telegram_service_chat_id)")
-        else
-            TELEGRAM_NOTIFY_SERVICE=""
-        fi
-
-        # Ask about TBLOCKER notifications (optional)
-        if prompt_yes_no "$(t telegram_enable_tblocker_notifications)"; then
-            TELEGRAM_NOTIFY_TBLOCKER=$(collect_telegram_channel "$(t telegram_tblocker_chat_id)")
-        else
-            TELEGRAM_NOTIFY_TBLOCKER=""
-        fi
+    # Ask about user notifications (optional)
+    if prompt_yes_no "$(t telegram_enable_user_notifications)"; then
+        TELEGRAM_NOTIFY_USERS=$(collect_telegram_channel "$(t telegram_users_chat_id)")
     else
-        show_warning "$(t warning_skipping_telegram)"
-        IS_TELEGRAM_NOTIFICATIONS_ENABLED=false
-        TELEGRAM_BOT_TOKEN=""
-        TELEGRAM_NOTIFY_NODES=""
         TELEGRAM_NOTIFY_USERS=""
+    fi
+
+    # Ask about CRM notifications (optional)
+    if prompt_yes_no "$(t telegram_enable_crm_notifications)"; then
+        TELEGRAM_NOTIFY_CRM=$(collect_telegram_channel "$(t telegram_crm_chat_id)")
+    else
         TELEGRAM_NOTIFY_CRM=""
+    fi
+
+    # Ask about service notifications (optional)
+    if prompt_yes_no "$(t telegram_enable_service_notifications)"; then
+        TELEGRAM_NOTIFY_SERVICE=$(collect_telegram_channel "$(t telegram_service_chat_id)")
+    else
         TELEGRAM_NOTIFY_SERVICE=""
+    fi
+
+    # Ask about TBLOCKER notifications (optional)
+    if prompt_yes_no "$(t telegram_enable_tblocker_notifications)"; then
+        TELEGRAM_NOTIFY_TBLOCKER=$(collect_telegram_channel "$(t telegram_tblocker_chat_id)")
+    else
         TELEGRAM_NOTIFY_TBLOCKER=""
     fi
 }
