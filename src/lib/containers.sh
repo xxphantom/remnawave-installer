@@ -249,9 +249,9 @@ start_container() {
     mapfile -t services < <(docker compose -f "$compose_file" config --services)
 
     # A crashing container is briefly "running" after each restart, so require two
-    # consecutive good polls
+    # consecutive good polls; stable=1 at the deadline still gets its confirming poll
     local all_ok=true elapsed=0 stable=0
-    while [[ $elapsed -lt $max_wait ]]; do
+    while [[ $elapsed -lt $max_wait || $stable -eq 1 ]]; do
         all_ok=true
         for svc in "${services[@]}"; do
             cid=$(docker compose -f "$compose_file" ps -q "$svc")

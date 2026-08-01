@@ -311,6 +311,7 @@ TRANSLATIONS_EN[update_cancelled]="Update cancelled by user"
 TRANSLATIONS_EN[update_recreate_panel_failed]="Failed to recreate panel services"
 TRANSLATIONS_EN[update_recreate_subscription_failed]="Failed to recreate subscription page services"
 TRANSLATIONS_EN[update_recreate_node_failed]="Failed to recreate node services"
+TRANSLATIONS_EN[update_verifying_panel]="Verifying the panel container stays up (may take up to 15 seconds)..."
 TRANSLATIONS_EN[update_panel_not_running]="Panel container is not running after the update"
 TRANSLATIONS_EN[update_check_logs]="Check the logs: cd /opt/remnawave && docker compose logs -f remnawave"
 TRANSLATIONS_EN[update_major_v3_title]="⚠️  A major panel update is available: 2.x → 3.x"
@@ -807,6 +808,7 @@ TRANSLATIONS_RU[update_cancelled]="Обновление отменено пол�
 TRANSLATIONS_RU[update_recreate_panel_failed]="Не удалось пересоздать сервисы панели"
 TRANSLATIONS_RU[update_recreate_subscription_failed]="Не удалось пересоздать сервисы страницы подписок"
 TRANSLATIONS_RU[update_recreate_node_failed]="Не удалось пересоздать сервисы ноды"
+TRANSLATIONS_RU[update_verifying_panel]="Проверяем, что контейнер панели остаётся запущенным (до 15 секунд)..."
 TRANSLATIONS_RU[update_panel_not_running]="Контейнер панели не запущен после обновления"
 TRANSLATIONS_RU[update_check_logs]="Проверьте логи: cd /opt/remnawave && docker compose logs -f remnawave"
 TRANSLATIONS_RU[update_major_v3_title]="⚠️  Доступно мажорное обновление панели: 2.x → 3.x"
@@ -1610,9 +1612,9 @@ start_container() {
     mapfile -t services < <(docker compose -f "$compose_file" config --services)
 
     # A crashing container is briefly "running" after each restart, so require two
-    # consecutive good polls
+    # consecutive good polls; stable=1 at the deadline still gets its confirming poll
     local all_ok=true elapsed=0 stable=0
-    while [[ $elapsed -lt $max_wait ]]; do
+    while [[ $elapsed -lt $max_wait || $stable -eq 1 ]]; do
         all_ok=true
         for svc in "${services[@]}"; do
             cid=$(docker compose -f "$compose_file" ps -q "$svc")
@@ -4468,11 +4470,18 @@ check_images_updated() {
 verify_container_running() {
     local container="$1"
     local checks="${2:-5}"
-    local i state
+    local i state restarts baseline
+
+    baseline=$(docker inspect -f '{{.RestartCount}}' "$container" 2>/dev/null) || return 1
 
     for ((i = 0; i < checks; i++)); do
         state=$(docker inspect -f '{{.State.Status}}' "$container" 2>/dev/null)
         if [ "$state" != "running" ]; then
+            return 1
+        fi
+        # A grown RestartCount means a crash between polls
+        restarts=$(docker inspect -f '{{.RestartCount}}' "$container" 2>/dev/null)
+        if [ "$restarts" != "$baseline" ]; then
             return 1
         fi
         sleep 1
@@ -4486,9 +4495,7 @@ migrate_panel_to_v3() {
     local compose_file="$panel_dir/docker-compose.yml"
     local env_file="$panel_dir/.env"
 
-    PANEL_V3_MIGRATED=false
-
-    if ! grep -qE '^[[:space:]]*image:[[:space:]]*remnawave/backend:2([.][0-9]+)*[[:space:]]*$' "$compose_file"; then
+    if ! grep -qE '^[[:space:]]*image:[[:space:]]*remnawave/backend:(2([.][0-9]+)*|latest)[[:space:]]*$' "$compose_file"; then
         return 0
     fi
 
@@ -4499,15 +4506,19 @@ migrate_panel_to_v3() {
     echo
 
     if ! prompt_yes_no "$(t update_major_v3_confirm)" "$YELLOW"; then
+        # :latest would still pull 3.x — pin declined installs to the 2.x major
+        sed -i -E 's#^([[:space:]]*image:[[:space:]]*)remnawave/backend:latest[[:space:]]*$#\1remnawave/backend:2#' "$compose_file"
         show_info "$(t update_major_v3_skipped)"
         return 0
     fi
 
     local stamp=$(date +%Y%m%d-%H%M%S)
+    local env_backup=""
     cp "$compose_file" "$compose_file.bak-$stamp"
 
     if [ -f "$env_file" ]; then
         cp "$env_file" "$env_file.bak-$stamp"
+        env_backup="$env_file.bak-$stamp"
 
         # Keep the JWT_AUTH_SECRET value — it signs the admin session and the
         # subscription page API token
@@ -4524,10 +4535,9 @@ migrate_panel_to_v3() {
         sed -i '/^JWT_API_TOKENS_SECRET=/d' "$env_file"
     fi
 
-    sed -i -E 's|^([[:space:]]*image:[[:space:]]*)remnawave/backend:2([.][0-9]+)*[[:space:]]*$|\1remnawave/backend:3|' "$compose_file"
+    sed -i -E 's#^([[:space:]]*image:[[:space:]]*)remnawave/backend:(2([.][0-9]+)*|latest)[[:space:]]*$#\1remnawave/backend:3#' "$compose_file"
 
-    PANEL_V3_MIGRATED=true
-    show_success "$(t update_major_v3_done) $env_file.bak-$stamp"
+    show_success "$(t update_major_v3_done) ${env_backup:-$compose_file.bak-$stamp}"
     return 0
 }
 
@@ -4617,9 +4627,12 @@ update_panel_only() {
     local node_updated=false
     local any_updates=false
 
-    # The migration rewrote the image tag, so the panel must be recreated even if
-    # the new image happens to be present locally already
-    if [ "$PANEL_V3_MIGRATED" = true ]; then
+    # Recreate when the existing container's image differs from the compose file:
+    # heals a migration interrupted before the recreate. || guards are for set -e
+    local compose_image running_image
+    compose_image=$(sed -nE 's/^[[:space:]]*image:[[:space:]]*(remnawave\/backend:[^[:space:]]+)[[:space:]]*$/\1/p' /opt/remnawave/docker-compose.yml | head -n1) || compose_image=""
+    running_image=$(docker inspect -f '{{.Config.Image}}' remnawave 2>/dev/null) || running_image=""
+    if [ -n "$compose_image" ] && [ -n "$running_image" ] && [ "$running_image" != "$compose_image" ]; then
         panel_updated=true
         any_updates=true
     fi
@@ -4713,8 +4726,10 @@ update_panel_only() {
             return 1
         fi
 
-        # A broken .env makes the panel exit right after start
-        if ! verify_container_running "remnawave"; then
+        # A broken .env makes the panel exit right after start; the first 3.x boot
+        # also runs DB migrations, hence the long window
+        show_info "$(t update_verifying_panel)" "$ORANGE"
+        if ! verify_container_running "remnawave" 15; then
             show_error "$(t update_panel_not_running)"
             show_error "$(t update_check_logs)"
             echo -e "${BOLD_YELLOW}$(t prompt_enter_to_return)${NC}"

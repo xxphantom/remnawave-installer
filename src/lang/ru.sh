@@ -210,6 +210,7 @@ TRANSLATIONS_RU[update_cancelled]="Обновление отменено пол�
 TRANSLATIONS_RU[update_recreate_panel_failed]="Не удалось пересоздать сервисы панели"
 TRANSLATIONS_RU[update_recreate_subscription_failed]="Не удалось пересоздать сервисы страницы подписок"
 TRANSLATIONS_RU[update_recreate_node_failed]="Не удалось пересоздать сервисы ноды"
+TRANSLATIONS_RU[update_verifying_panel]="Проверяем, что контейнер панели остаётся запущенным (до 15 секунд)..."
 TRANSLATIONS_RU[update_panel_not_running]="Контейнер панели не запущен после обновления"
 TRANSLATIONS_RU[update_check_logs]="Проверьте логи: cd /opt/remnawave && docker compose logs -f remnawave"
 TRANSLATIONS_RU[update_major_v3_title]="⚠️  Доступно мажорное обновление панели: 2.x → 3.x"
