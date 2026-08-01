@@ -157,11 +157,18 @@ handle_installation_menu() {
 main() {
     while true; do
         show_main_menu
-        read choice
+        read -r choice
 
         if [ "$choice" = "0" ]; then
             echo "$(t exiting)"
             break
+        fi
+
+        if [[ -z "$choice" || ! "$choice" =~ ^[0-9]+$ ]]; then
+            clear
+            echo -e "${BOLD_RED}$(t error_invalid_choice)${NC}"
+            sleep 1
+            continue
         fi
 
         local action="${MENU_ACTIONS[$choice]:-}"
