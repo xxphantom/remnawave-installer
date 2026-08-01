@@ -62,7 +62,8 @@ VERSION="2.2.0"
 if [[ "$REMNAWAVE_BRANCH" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
     # Use the version number as tag directly
     REMNAWAVE_BACKEND_TAG="$REMNAWAVE_BRANCH"
-    REMNAWAVE_NODE_TAG="$REMNAWAVE_BRANCH"
+    # Node is versioned independently — a panel version is not a valid node tag
+    REMNAWAVE_NODE_TAG="latest"
 elif [ "$REMNAWAVE_BRANCH" = "dev" ]; then
     REMNAWAVE_BACKEND_TAG="dev"
     REMNAWAVE_NODE_TAG="dev"
@@ -70,12 +71,21 @@ elif [ "$REMNAWAVE_BRANCH" = "alpha" ]; then
     REMNAWAVE_BACKEND_TAG="alpha"
     REMNAWAVE_NODE_TAG="dev"  # Node doesn't have alpha tag, use dev
 else
-    # Default to major version 2 for main branch (stable)
-    REMNAWAVE_BACKEND_TAG="2"
+    # Default to major version 3 for main branch (stable)
+    REMNAWAVE_BACKEND_TAG="3"
     REMNAWAVE_NODE_TAG="latest"
 fi
 
-REMNAWAVE_BACKEND_REPO="https://raw.githubusercontent.com/remnawave/backend/refs/heads"
+if [[ "$REMNAWAVE_BRANCH" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+    REMNAWAVE_BACKEND_ENV_REF="refs/tags/$REMNAWAVE_BRANCH"
+elif [ "$REMNAWAVE_BRANCH" = "alpha" ]; then
+    REMNAWAVE_BACKEND_ENV_REF="refs/heads/dev"
+else
+    REMNAWAVE_BACKEND_ENV_REF="refs/heads/$REMNAWAVE_BRANCH"
+fi
+
+REMNAWAVE_BACKEND_RAW="https://raw.githubusercontent.com/remnawave/backend"
+REMNAWAVE_ENV_SAMPLE_URL="$REMNAWAVE_BACKEND_RAW/$REMNAWAVE_BACKEND_ENV_REF/.env.sample"
 INSTALLER_REPO="https://raw.githubusercontent.com/xxphantom/remnawave-installer/refs/heads"
 
 REMNAWAVE_DIR="/opt/remnawave"
@@ -298,6 +308,17 @@ TRANSLATIONS_EN[update_no_restart_needed]="No restart needed - services are alre
 TRANSLATIONS_EN[update_cleaning_images]="Cleaning unused images..."
 TRANSLATIONS_EN[update_cleanup_complete]="Cleanup completed"
 TRANSLATIONS_EN[update_cancelled]="Update cancelled by user"
+TRANSLATIONS_EN[update_recreate_panel_failed]="Failed to recreate panel services"
+TRANSLATIONS_EN[update_recreate_subscription_failed]="Failed to recreate subscription page services"
+TRANSLATIONS_EN[update_recreate_node_failed]="Failed to recreate node services"
+TRANSLATIONS_EN[update_panel_not_running]="Panel container is not running after the update"
+TRANSLATIONS_EN[update_check_logs]="Check the logs: cd /opt/remnawave && docker compose logs -f remnawave"
+TRANSLATIONS_EN[update_major_v3_title]="⚠️  A major panel update is available: 2.x → 3.x"
+TRANSLATIONS_EN[update_major_v3_details]="• This release contains breaking changes. Back up your database first, then read the changelog:"
+TRANSLATIONS_EN[update_major_v3_confirm]="Update the panel to version 3.x?"
+TRANSLATIONS_EN[update_major_v3_skipped]="Staying on panel 2.x, only 2.x updates will be installed"
+TRANSLATIONS_EN[update_major_v3_done]="Configuration migrated to 3.x, backup saved to"
+TRANSLATIONS_EN[update_major_v3_new_secret]="JWT_AUTH_SECRET not found in .env, a new APP_SECRET was generated. Recreate the subscription page API token if it stops working."
 
 TRANSLATIONS_EN[services_starting_containers]="Starting containers..."
 TRANSLATIONS_EN[services_installation_stopped]="Installation stopped"
@@ -367,6 +388,7 @@ TRANSLATIONS_EN[spinner_setting_auto_updates]="Setting auto-updates"
 TRANSLATIONS_EN[spinner_downloading_static_files]="Downloading static files for the selfsteal site..."
 
 TRANSLATIONS_EN[config_invalid_arguments]="Error: invalid number of arguments. Should be even number of keys and values."
+TRANSLATIONS_EN[config_env_download_failed]="Failed to download the .env template:"
 TRANSLATIONS_EN[config_domain_already_used]="Domain"
 TRANSLATIONS_EN[config_domains_must_be_unique]="Each domain must be unique: panel domain, subscription domain, and selfsteal domain must all be different."
 TRANSLATIONS_EN[config_node_port_available]="Required Node API port 2222 is available"
@@ -423,6 +445,8 @@ TRANSLATIONS_EN[api_failed_create_user_status]="Error: Failed to create user. HT
 TRANSLATIONS_EN[api_failed_create_user_format]="Error: Failed to create user, invalid response format:"
 TRANSLATIONS_EN[api_failed_register_user]="Failed to register user."
 TRANSLATIONS_EN[api_failed_create_token]="Error: Failed to create API token for Subscription Page."
+TRANSLATIONS_EN[api_failed_generate_keys]="Error: Failed to generate x25519 keys via the panel API."
+TRANSLATIONS_EN[api_failed_extract_keys]="Error: Failed to extract x25519 keys from the panel response."
 TRANSLATIONS_EN[api_request_body_was]="Request body was:"
 TRANSLATIONS_EN[api_response]="Response:"
 
@@ -780,6 +804,17 @@ TRANSLATIONS_RU[update_no_restart_needed]="Перезапуск не требу�
 TRANSLATIONS_RU[update_cleaning_images]="Очистка неиспользуемых образов..."
 TRANSLATIONS_RU[update_cleanup_complete]="Очистка завершена"
 TRANSLATIONS_RU[update_cancelled]="Обновление отменено пользователем"
+TRANSLATIONS_RU[update_recreate_panel_failed]="Не удалось пересоздать сервисы панели"
+TRANSLATIONS_RU[update_recreate_subscription_failed]="Не удалось пересоздать сервисы страницы подписок"
+TRANSLATIONS_RU[update_recreate_node_failed]="Не удалось пересоздать сервисы ноды"
+TRANSLATIONS_RU[update_panel_not_running]="Контейнер панели не запущен после обновления"
+TRANSLATIONS_RU[update_check_logs]="Проверьте логи: cd /opt/remnawave && docker compose logs -f remnawave"
+TRANSLATIONS_RU[update_major_v3_title]="⚠️  Доступно мажорное обновление панели: 2.x → 3.x"
+TRANSLATIONS_RU[update_major_v3_details]="• В этом релизе есть несовместимые изменения. Сделайте резервную копию базы данных и прочитайте changelog:"
+TRANSLATIONS_RU[update_major_v3_confirm]="Обновить панель до версии 3.x?"
+TRANSLATIONS_RU[update_major_v3_skipped]="Остаёмся на панели 2.x, будут установлены только обновления 2.x"
+TRANSLATIONS_RU[update_major_v3_done]="Конфигурация мигрирована на 3.x, резервная копия сохранена в"
+TRANSLATIONS_RU[update_major_v3_new_secret]="В .env не найден JWT_AUTH_SECRET, сгенерирован новый APP_SECRET. Если страница подписок перестанет работать, пересоздайте API-токен."
 
 TRANSLATIONS_RU[services_starting_containers]="Запуск контейнеров..."
 TRANSLATIONS_RU[services_installation_stopped]="Установка остановлена"
@@ -849,6 +884,7 @@ TRANSLATIONS_RU[spinner_setting_auto_updates]="Настройка автообн
 TRANSLATIONS_RU[spinner_downloading_static_files]="Загрузка статических файлов для сайта selfsteal..."
 
 TRANSLATIONS_RU[config_invalid_arguments]="Ошибка: неверное количество аргументов. Должно быть четное количество ключей и значений."
+TRANSLATIONS_RU[config_env_download_failed]="Не удалось скачать шаблон .env:"
 TRANSLATIONS_RU[config_domain_already_used]="Домен"
 TRANSLATIONS_RU[config_domains_must_be_unique]="Каждый домен должен быть уникальным: домен панели, домен подписки и домен selfsteal должны быть разными."
 TRANSLATIONS_RU[config_node_port_available]="Требуемый порт API ноды 2222 доступен"
@@ -905,6 +941,8 @@ TRANSLATIONS_RU[api_failed_create_user_status]="Ошибка: Не удалос�
 TRANSLATIONS_RU[api_failed_create_user_format]="Ошибка: Не удалось создать пользователя, неверный формат ответа:"
 TRANSLATIONS_RU[api_failed_register_user]="Не удалось зарегистрировать пользователя."
 TRANSLATIONS_RU[api_failed_create_token]="Ошибка: Не удалось создать API токен для Subscription Page."
+TRANSLATIONS_RU[api_failed_generate_keys]="Ошибка: Не удалось сгенерировать x25519-ключи через API панели."
+TRANSLATIONS_RU[api_failed_extract_keys]="Ошибка: Не удалось извлечь x25519-ключи из ответа панели."
 TRANSLATIONS_RU[api_request_body_was]="Тело запроса было:"
 TRANSLATIONS_RU[api_response]="Ответ:"
 
@@ -1571,7 +1609,9 @@ start_container() {
 
     mapfile -t services < <(docker compose -f "$compose_file" config --services)
 
-    local all_ok=true elapsed=0
+    # A crashing container is briefly "running" after each restart, so require two
+    # consecutive good polls
+    local all_ok=true elapsed=0 stable=0
     while [[ $elapsed -lt $max_wait ]]; do
         all_ok=true
         for svc in "${services[@]}"; do
@@ -1582,12 +1622,17 @@ start_container() {
                 break
             fi
         done
-        $all_ok && break
+        if $all_ok; then
+            stable=$((stable + 1))
+            [[ $stable -ge 2 ]] && break
+        else
+            stable=0
+        fi
         sleep $poll
         ((elapsed += poll))
     done
 
-    if $all_ok; then
+    if $all_ok && [[ $stable -ge 2 ]]; then
         printf "${BOLD_GREEN}$(t container_success_up)${NC}\n" \
             "$display_name" "$(
                 IFS=,
@@ -2314,6 +2359,8 @@ generate_custom_path() {
 }
 
 generate_secrets() {
+    # 3.0.0 uses a single APP_SECRET; the JWT_* secrets remain for --panel-branch=2.x
+    APP_SECRET=$(openssl rand -hex 32 | tr -d '\n')
     JWT_AUTH_SECRET=$(openssl rand -hex 32 | tr -d '\n')
     JWT_API_TOKENS_SECRET=$(openssl rand -hex 32 | tr -d '\n')
     DB_USER="remnawave_$(openssl rand -hex 4 | tr -d '\n')"
@@ -2539,12 +2586,13 @@ delete_config_profile() {
     rm -f "$temp_file"
     
     # Check for successful deletion
+    # Panel 3.0.0 answers 204 with an empty body, 2.x answered {"response":{"isDeleted":true}}
     if [ -z "$delete_response" ] || echo "$delete_response" | jq -e '.response.isDeleted == true' >/dev/null 2>&1; then
         return 0
     fi
-    
+
     # Check if response indicates error
-    if echo "$delete_response" | jq -e '.error' >/dev/null 2>&1; then
+    if echo "$delete_response" | jq -e '.error // .errorCode // .message' >/dev/null 2>&1; then
         echo -e "${BOLD_RED}$(t api_failed_delete_profile)${NC}"
         echo
         echo "$(t api_response):"
@@ -2810,11 +2858,11 @@ EOF
         return 1
     fi
 
-    if echo "$user_response" | jq -e '.response.uuid' >/dev/null; then
+    # Panel 3.0.0 dropped the user uuid in favour of a numeric id and removed subscriptionUuid
+    if echo "$user_response" | jq -e '.response.id // .response.uuid' >/dev/null; then
         # Extract user data and save to global variables
-        USER_UUID=$(echo "$user_response" | jq -r '.response.uuid')
+        USER_ID=$(echo "$user_response" | jq -r '.response.id // .response.uuid')
         USER_SHORT_UUID=$(echo "$user_response" | jq -r '.response.shortUuid')
-        USER_SUBSCRIPTION_UUID=$(echo "$user_response" | jq -r '.response.subscriptionUuid')
         USER_VLESS_UUID=$(echo "$user_response" | jq -r '.response.vlessUuid')
         USER_TROJAN_PASSWORD=$(echo "$user_response" | jq -r '.response.trojanPassword')
         USER_SS_PASSWORD=$(echo "$user_response" | jq -r '.response.ssPassword')
@@ -3089,21 +3137,30 @@ collect_ports_separate_installation() {
 }
 
 setup_panel_environment() {
-    # Download environment template
-    # For alpha branch, use dev branch's .env file
-    # For numeric versions, use main branch's .env file
-    local env_branch="$REMNAWAVE_BRANCH"
-    if [ "$REMNAWAVE_BRANCH" = "alpha" ]; then
-        env_branch="dev"
-    elif [[ "$REMNAWAVE_BRANCH" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
-        env_branch="main"
+    # Download the environment template from the ref matching the panel version
+    if ! curl -fsSL -o .env "$REMNAWAVE_ENV_SAMPLE_URL"; then
+        show_error "$(t config_env_download_failed) $REMNAWAVE_ENV_SAMPLE_URL"
+        return 1
     fi
-    curl -s -o .env "$REMNAWAVE_BACKEND_REPO/$env_branch/.env.sample"
+
+    if [ ! -s .env ]; then
+        show_error "$(t config_env_download_failed) $REMNAWAVE_ENV_SAMPLE_URL"
+        return 1
+    fi
+
+    # APP_SECRET is always written (the panel rejects the sample's `change_me` default);
+    # legacy JWT_* only when the downloaded template still declares them
+    local secrets=("APP_SECRET" "$APP_SECRET")
+    if grep -q '^JWT_AUTH_SECRET=' .env; then
+        secrets+=("JWT_AUTH_SECRET" "$JWT_AUTH_SECRET")
+    fi
+    if grep -q '^JWT_API_TOKENS_SECRET=' .env; then
+        secrets+=("JWT_API_TOKENS_SECRET" "$JWT_API_TOKENS_SECRET")
+    fi
 
     # Update environment file
     update_file ".env" \
-        "JWT_AUTH_SECRET" "$JWT_AUTH_SECRET" \
-        "JWT_API_TOKENS_SECRET" "$JWT_API_TOKENS_SECRET" \
+        "${secrets[@]}" \
         "IS_TELEGRAM_NOTIFICATIONS_ENABLED" "$IS_TELEGRAM_NOTIFICATIONS_ENABLED" \
         "TELEGRAM_BOT_TOKEN" "$TELEGRAM_BOT_TOKEN" \
         "TELEGRAM_NOTIFY_NODES" "$TELEGRAM_NOTIFY_NODES" \
@@ -4408,6 +4465,72 @@ check_images_updated() {
     fi
 }
 
+verify_container_running() {
+    local container="$1"
+    local checks="${2:-5}"
+    local i state
+
+    for ((i = 0; i < checks; i++)); do
+        state=$(docker inspect -f '{{.State.Status}}' "$container" 2>/dev/null)
+        if [ "$state" != "running" ]; then
+            return 1
+        fi
+        sleep 1
+    done
+
+    return 0
+}
+
+migrate_panel_to_v3() {
+    local panel_dir="$1"
+    local compose_file="$panel_dir/docker-compose.yml"
+    local env_file="$panel_dir/.env"
+
+    PANEL_V3_MIGRATED=false
+
+    if ! grep -qE '^[[:space:]]*image:[[:space:]]*remnawave/backend:2([.][0-9]+)*[[:space:]]*$' "$compose_file"; then
+        return 0
+    fi
+
+    echo
+    echo -e "${YELLOW}$(t update_major_v3_title)${NC}"
+    echo -e "${YELLOW}$(t update_major_v3_details)${NC}"
+    echo -e "${BLUE}$(t update_warning_panel_releases)${NC}"
+    echo
+
+    if ! prompt_yes_no "$(t update_major_v3_confirm)" "$YELLOW"; then
+        show_info "$(t update_major_v3_skipped)"
+        return 0
+    fi
+
+    local stamp=$(date +%Y%m%d-%H%M%S)
+    cp "$compose_file" "$compose_file.bak-$stamp"
+
+    if [ -f "$env_file" ]; then
+        cp "$env_file" "$env_file.bak-$stamp"
+
+        # Keep the JWT_AUTH_SECRET value — it signs the admin session and the
+        # subscription page API token
+        if ! grep -q '^APP_SECRET=' "$env_file"; then
+            if grep -q '^JWT_AUTH_SECRET=' "$env_file"; then
+                sed -i 's/^JWT_AUTH_SECRET=/APP_SECRET=/' "$env_file"
+            else
+                echo "APP_SECRET=$(openssl rand -hex 32 | tr -d '\n')" >>"$env_file"
+                show_warning "$(t update_major_v3_new_secret)"
+            fi
+        fi
+
+        # Gone in 3.0.0, dropped only to keep .env tidy
+        sed -i '/^JWT_API_TOKENS_SECRET=/d' "$env_file"
+    fi
+
+    sed -i -E 's|^([[:space:]]*image:[[:space:]]*)remnawave/backend:2([.][0-9]+)*[[:space:]]*$|\1remnawave/backend:3|' "$compose_file"
+
+    PANEL_V3_MIGRATED=true
+    show_success "$(t update_major_v3_done) $env_file.bak-$stamp"
+    return 0
+}
+
 show_update_warning() {
     local component_type="$1"  # "panel", "node", or "all"
 
@@ -4485,11 +4608,21 @@ update_panel_only() {
         SUBSCRIPTION_PAGE_EXISTS=true
     fi
 
+    # Offer the 2.x -> 3.x migration before pulling anything
+    migrate_panel_to_v3 "/opt/remnawave"
+
     # Check for updates and track what needs restart
     local panel_updated=false
     local subscription_updated=false
     local node_updated=false
     local any_updates=false
+
+    # The migration rewrote the image tag, so the panel must be recreated even if
+    # the new image happens to be present locally already
+    if [ "$PANEL_V3_MIGRATED" = true ]; then
+        panel_updated=true
+        any_updates=true
+    fi
 
     # Check panel updates
     show_info "$(t update_checking_images)" "$ORANGE"
@@ -4571,9 +4704,19 @@ update_panel_only() {
     # Recreate panel if it was updated
     if [ "$panel_updated" = true ]; then
         cd /opt/remnawave && docker compose up -d --remove-orphans --force-recreate >/dev/null 2>&1 &
-        spinner $! "$(t update_starting_services)"
-        if [ $? -ne 0 ]; then
-            show_error "Failed to recreate panel services"
+        local recreate_pid=$!
+        spinner $recreate_pid "$(t update_starting_services)"
+        if ! wait $recreate_pid; then
+            show_error "$(t update_recreate_panel_failed)"
+            echo -e "${BOLD_YELLOW}$(t prompt_enter_to_return)${NC}"
+            read -r
+            return 1
+        fi
+
+        # A broken .env makes the panel exit right after start
+        if ! verify_container_running "remnawave"; then
+            show_error "$(t update_panel_not_running)"
+            show_error "$(t update_check_logs)"
             echo -e "${BOLD_YELLOW}$(t prompt_enter_to_return)${NC}"
             read -r
             return 1
@@ -4583,9 +4726,10 @@ update_panel_only() {
     # Recreate subscription page if it was updated
     if [ "$SUBSCRIPTION_PAGE_EXISTS" = true ] && [ "$subscription_updated" = true ]; then
         cd "$sub_page_dir" && docker compose up -d --remove-orphans --force-recreate >/dev/null 2>&1 &
-        spinner $! "$(t update_starting_services)"
-        if [ $? -ne 0 ]; then
-            show_error "Failed to recreate subscription page services"
+        local recreate_pid=$!
+        spinner $recreate_pid "$(t update_starting_services)"
+        if ! wait $recreate_pid; then
+            show_error "$(t update_recreate_subscription_failed)"
             echo -e "${BOLD_YELLOW}$(t prompt_enter_to_return)${NC}"
             read -r
             return 1
@@ -4595,9 +4739,10 @@ update_panel_only() {
     # Recreate node if it was updated
     if [ "$NODE_EXISTS" = true ] && [ "$node_updated" = true ]; then
         cd "$node_dir" && docker compose up -d --remove-orphans --force-recreate >/dev/null 2>&1 &
-        spinner $! "$(t update_starting_services)"
-        if [ $? -ne 0 ]; then
-            show_error "Failed to recreate node services"
+        local recreate_pid=$!
+        spinner $recreate_pid "$(t update_starting_services)"
+        if ! wait $recreate_pid; then
+            show_error "$(t update_recreate_node_failed)"
             echo -e "${BOLD_YELLOW}$(t prompt_enter_to_return)${NC}"
             read -r
             return 1
@@ -4678,9 +4823,10 @@ update_node_only() {
     # Recreate services with new images
     show_info "$(t update_starting_services)" "$ORANGE"
     cd "$node_dir" && docker compose up -d --remove-orphans --force-recreate >/dev/null 2>&1 &
-    spinner $! "$(t update_starting_services)"
-    if [ $? -ne 0 ]; then
-        show_error "Failed to recreate node services"
+    local recreate_pid=$!
+    spinner $recreate_pid "$(t update_starting_services)"
+    if ! wait $recreate_pid; then
+        show_error "$(t update_recreate_node_failed)"
         echo -e "${BOLD_YELLOW}$(t prompt_enter_to_return)${NC}"
         read -r
         return 1
@@ -6081,7 +6227,9 @@ install_panel_only() {
 
     setup_panel_docker_compose
 
-    setup_panel_environment
+    if ! setup_panel_environment; then
+        return 1
+    fi
 
     create_makefile "$REMNAWAVE_DIR"
 
@@ -7057,7 +7205,9 @@ install_remnawave_all_in_one() {
 
     setup_panel_docker_compose
 
-    setup_panel_environment
+    if ! setup_panel_environment; then
+        return 1
+    fi
 
     create_makefile "$REMNAWAVE_DIR"
 

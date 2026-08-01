@@ -207,6 +207,17 @@ TRANSLATIONS_RU[update_no_restart_needed]="Перезапуск не требу�
 TRANSLATIONS_RU[update_cleaning_images]="Очистка неиспользуемых образов..."
 TRANSLATIONS_RU[update_cleanup_complete]="Очистка завершена"
 TRANSLATIONS_RU[update_cancelled]="Обновление отменено пользователем"
+TRANSLATIONS_RU[update_recreate_panel_failed]="Не удалось пересоздать сервисы панели"
+TRANSLATIONS_RU[update_recreate_subscription_failed]="Не удалось пересоздать сервисы страницы подписок"
+TRANSLATIONS_RU[update_recreate_node_failed]="Не удалось пересоздать сервисы ноды"
+TRANSLATIONS_RU[update_panel_not_running]="Контейнер панели не запущен после обновления"
+TRANSLATIONS_RU[update_check_logs]="Проверьте логи: cd /opt/remnawave && docker compose logs -f remnawave"
+TRANSLATIONS_RU[update_major_v3_title]="⚠️  Доступно мажорное обновление панели: 2.x → 3.x"
+TRANSLATIONS_RU[update_major_v3_details]="• В этом релизе есть несовместимые изменения. Сделайте резервную копию базы данных и прочитайте changelog:"
+TRANSLATIONS_RU[update_major_v3_confirm]="Обновить панель до версии 3.x?"
+TRANSLATIONS_RU[update_major_v3_skipped]="Остаёмся на панели 2.x, будут установлены только обновления 2.x"
+TRANSLATIONS_RU[update_major_v3_done]="Конфигурация мигрирована на 3.x, резервная копия сохранена в"
+TRANSLATIONS_RU[update_major_v3_new_secret]="В .env не найден JWT_AUTH_SECRET, сгенерирован новый APP_SECRET. Если страница подписок перестанет работать, пересоздайте API-токен."
 
 # Services
 TRANSLATIONS_RU[services_starting_containers]="Запуск контейнеров..."
@@ -281,6 +292,7 @@ TRANSLATIONS_RU[spinner_downloading_static_files]="Загрузка статич
 
 # Config
 TRANSLATIONS_RU[config_invalid_arguments]="Ошибка: неверное количество аргументов. Должно быть четное количество ключей и значений."
+TRANSLATIONS_RU[config_env_download_failed]="Не удалось скачать шаблон .env:"
 TRANSLATIONS_RU[config_domain_already_used]="Домен"
 TRANSLATIONS_RU[config_domains_must_be_unique]="Каждый домен должен быть уникальным: домен панели, домен подписки и домен selfsteal должны быть разными."
 TRANSLATIONS_RU[config_node_port_available]="Требуемый порт API ноды 2222 доступен"
@@ -340,6 +352,8 @@ TRANSLATIONS_RU[api_failed_create_user_status]="Ошибка: Не удалос�
 TRANSLATIONS_RU[api_failed_create_user_format]="Ошибка: Не удалось создать пользователя, неверный формат ответа:"
 TRANSLATIONS_RU[api_failed_register_user]="Не удалось зарегистрировать пользователя."
 TRANSLATIONS_RU[api_failed_create_token]="Ошибка: Не удалось создать API токен для Subscription Page."
+TRANSLATIONS_RU[api_failed_generate_keys]="Ошибка: Не удалось сгенерировать x25519-ключи через API панели."
+TRANSLATIONS_RU[api_failed_extract_keys]="Ошибка: Не удалось извлечь x25519-ключи из ответа панели."
 TRANSLATIONS_RU[api_request_body_was]="Тело запроса было:"
 TRANSLATIONS_RU[api_response]="Ответ:"
 

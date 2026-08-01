@@ -43,6 +43,75 @@ check_images_updated() {
     fi
 }
 
+# Verify a container stays up: a crash-looping panel briefly shows "running" too
+verify_container_running() {
+    local container="$1"
+    local checks="${2:-5}"
+    local i state
+
+    for ((i = 0; i < checks; i++)); do
+        state=$(docker inspect -f '{{.State.Status}}' "$container" 2>/dev/null)
+        if [ "$state" != "running" ]; then
+            return 1
+        fi
+        sleep 1
+    done
+
+    return 0
+}
+
+# Panel 3.0.0 renamed JWT_AUTH_SECRET to APP_SECRET and bumped the image major tag.
+# Installs pinned to :2 would never see 3.x — offer the migration on update.
+migrate_panel_to_v3() {
+    local panel_dir="$1"
+    local compose_file="$panel_dir/docker-compose.yml"
+    local env_file="$panel_dir/.env"
+
+    PANEL_V3_MIGRATED=false
+
+    if ! grep -qE '^[[:space:]]*image:[[:space:]]*remnawave/backend:2([.][0-9]+)*[[:space:]]*$' "$compose_file"; then
+        return 0
+    fi
+
+    echo
+    echo -e "${YELLOW}$(t update_major_v3_title)${NC}"
+    echo -e "${YELLOW}$(t update_major_v3_details)${NC}"
+    echo -e "${BLUE}$(t update_warning_panel_releases)${NC}"
+    echo
+
+    if ! prompt_yes_no "$(t update_major_v3_confirm)" "$YELLOW"; then
+        show_info "$(t update_major_v3_skipped)"
+        return 0
+    fi
+
+    local stamp=$(date +%Y%m%d-%H%M%S)
+    cp "$compose_file" "$compose_file.bak-$stamp"
+
+    if [ -f "$env_file" ]; then
+        cp "$env_file" "$env_file.bak-$stamp"
+
+        # Keep the JWT_AUTH_SECRET value — it signs the admin session and the
+        # subscription page API token
+        if ! grep -q '^APP_SECRET=' "$env_file"; then
+            if grep -q '^JWT_AUTH_SECRET=' "$env_file"; then
+                sed -i 's/^JWT_AUTH_SECRET=/APP_SECRET=/' "$env_file"
+            else
+                echo "APP_SECRET=$(openssl rand -hex 32 | tr -d '\n')" >>"$env_file"
+                show_warning "$(t update_major_v3_new_secret)"
+            fi
+        fi
+
+        # Gone in 3.0.0, dropped only to keep .env tidy
+        sed -i '/^JWT_API_TOKENS_SECRET=/d' "$env_file"
+    fi
+
+    sed -i -E 's|^([[:space:]]*image:[[:space:]]*)remnawave/backend:2([.][0-9]+)*[[:space:]]*$|\1remnawave/backend:3|' "$compose_file"
+
+    PANEL_V3_MIGRATED=true
+    show_success "$(t update_major_v3_done) $env_file.bak-$stamp"
+    return 0
+}
+
 # Show update warning and get confirmation
 show_update_warning() {
     local component_type="$1"  # "panel", "node", or "all"
@@ -122,11 +191,21 @@ update_panel_only() {
         SUBSCRIPTION_PAGE_EXISTS=true
     fi
 
+    # Offer the 2.x -> 3.x migration before pulling anything
+    migrate_panel_to_v3 "/opt/remnawave"
+
     # Check for updates and track what needs restart
     local panel_updated=false
     local subscription_updated=false
     local node_updated=false
     local any_updates=false
+
+    # The migration rewrote the image tag, so the panel must be recreated even if
+    # the new image happens to be present locally already
+    if [ "$PANEL_V3_MIGRATED" = true ]; then
+        panel_updated=true
+        any_updates=true
+    fi
 
     # Check panel updates
     show_info "$(t update_checking_images)" "$ORANGE"
@@ -208,9 +287,19 @@ update_panel_only() {
     # Recreate panel if it was updated
     if [ "$panel_updated" = true ]; then
         cd /opt/remnawave && docker compose up -d --remove-orphans --force-recreate >/dev/null 2>&1 &
-        spinner $! "$(t update_starting_services)"
-        if [ $? -ne 0 ]; then
-            show_error "Failed to recreate panel services"
+        local recreate_pid=$!
+        spinner $recreate_pid "$(t update_starting_services)"
+        if ! wait $recreate_pid; then
+            show_error "$(t update_recreate_panel_failed)"
+            echo -e "${BOLD_YELLOW}$(t prompt_enter_to_return)${NC}"
+            read -r
+            return 1
+        fi
+
+        # A broken .env makes the panel exit right after start
+        if ! verify_container_running "remnawave"; then
+            show_error "$(t update_panel_not_running)"
+            show_error "$(t update_check_logs)"
             echo -e "${BOLD_YELLOW}$(t prompt_enter_to_return)${NC}"
             read -r
             return 1
@@ -220,9 +309,10 @@ update_panel_only() {
     # Recreate subscription page if it was updated
     if [ "$SUBSCRIPTION_PAGE_EXISTS" = true ] && [ "$subscription_updated" = true ]; then
         cd "$sub_page_dir" && docker compose up -d --remove-orphans --force-recreate >/dev/null 2>&1 &
-        spinner $! "$(t update_starting_services)"
-        if [ $? -ne 0 ]; then
-            show_error "Failed to recreate subscription page services"
+        local recreate_pid=$!
+        spinner $recreate_pid "$(t update_starting_services)"
+        if ! wait $recreate_pid; then
+            show_error "$(t update_recreate_subscription_failed)"
             echo -e "${BOLD_YELLOW}$(t prompt_enter_to_return)${NC}"
             read -r
             return 1
@@ -232,9 +322,10 @@ update_panel_only() {
     # Recreate node if it was updated
     if [ "$NODE_EXISTS" = true ] && [ "$node_updated" = true ]; then
         cd "$node_dir" && docker compose up -d --remove-orphans --force-recreate >/dev/null 2>&1 &
-        spinner $! "$(t update_starting_services)"
-        if [ $? -ne 0 ]; then
-            show_error "Failed to recreate node services"
+        local recreate_pid=$!
+        spinner $recreate_pid "$(t update_starting_services)"
+        if ! wait $recreate_pid; then
+            show_error "$(t update_recreate_node_failed)"
             echo -e "${BOLD_YELLOW}$(t prompt_enter_to_return)${NC}"
             read -r
             return 1
@@ -316,9 +407,10 @@ update_node_only() {
     # Recreate services with new images
     show_info "$(t update_starting_services)" "$ORANGE"
     cd "$node_dir" && docker compose up -d --remove-orphans --force-recreate >/dev/null 2>&1 &
-    spinner $! "$(t update_starting_services)"
-    if [ $? -ne 0 ]; then
-        show_error "Failed to recreate node services"
+    local recreate_pid=$!
+    spinner $recreate_pid "$(t update_starting_services)"
+    if ! wait $recreate_pid; then
+        show_error "$(t update_recreate_node_failed)"
         echo -e "${BOLD_YELLOW}$(t prompt_enter_to_return)${NC}"
         read -r
         return 1

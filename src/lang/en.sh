@@ -207,6 +207,17 @@ TRANSLATIONS_EN[update_no_restart_needed]="No restart needed - services are alre
 TRANSLATIONS_EN[update_cleaning_images]="Cleaning unused images..."
 TRANSLATIONS_EN[update_cleanup_complete]="Cleanup completed"
 TRANSLATIONS_EN[update_cancelled]="Update cancelled by user"
+TRANSLATIONS_EN[update_recreate_panel_failed]="Failed to recreate panel services"
+TRANSLATIONS_EN[update_recreate_subscription_failed]="Failed to recreate subscription page services"
+TRANSLATIONS_EN[update_recreate_node_failed]="Failed to recreate node services"
+TRANSLATIONS_EN[update_panel_not_running]="Panel container is not running after the update"
+TRANSLATIONS_EN[update_check_logs]="Check the logs: cd /opt/remnawave && docker compose logs -f remnawave"
+TRANSLATIONS_EN[update_major_v3_title]="⚠️  A major panel update is available: 2.x → 3.x"
+TRANSLATIONS_EN[update_major_v3_details]="• This release contains breaking changes. Back up your database first, then read the changelog:"
+TRANSLATIONS_EN[update_major_v3_confirm]="Update the panel to version 3.x?"
+TRANSLATIONS_EN[update_major_v3_skipped]="Staying on panel 2.x, only 2.x updates will be installed"
+TRANSLATIONS_EN[update_major_v3_done]="Configuration migrated to 3.x, backup saved to"
+TRANSLATIONS_EN[update_major_v3_new_secret]="JWT_AUTH_SECRET not found in .env, a new APP_SECRET was generated. Recreate the subscription page API token if it stops working."
 
 # Services
 TRANSLATIONS_EN[services_starting_containers]="Starting containers..."
@@ -281,6 +292,7 @@ TRANSLATIONS_EN[spinner_downloading_static_files]="Downloading static files for 
 
 # Config
 TRANSLATIONS_EN[config_invalid_arguments]="Error: invalid number of arguments. Should be even number of keys and values."
+TRANSLATIONS_EN[config_env_download_failed]="Failed to download the .env template:"
 TRANSLATIONS_EN[config_domain_already_used]="Domain"
 TRANSLATIONS_EN[config_domains_must_be_unique]="Each domain must be unique: panel domain, subscription domain, and selfsteal domain must all be different."
 TRANSLATIONS_EN[config_node_port_available]="Required Node API port 2222 is available"
@@ -340,6 +352,8 @@ TRANSLATIONS_EN[api_failed_create_user_status]="Error: Failed to create user. HT
 TRANSLATIONS_EN[api_failed_create_user_format]="Error: Failed to create user, invalid response format:"
 TRANSLATIONS_EN[api_failed_register_user]="Failed to register user."
 TRANSLATIONS_EN[api_failed_create_token]="Error: Failed to create API token for Subscription Page."
+TRANSLATIONS_EN[api_failed_generate_keys]="Error: Failed to generate x25519 keys via the panel API."
+TRANSLATIONS_EN[api_failed_extract_keys]="Error: Failed to extract x25519 keys from the panel response."
 TRANSLATIONS_EN[api_request_body_was]="Request body was:"
 TRANSLATIONS_EN[api_response]="Response:"
 

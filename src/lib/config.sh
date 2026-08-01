@@ -198,21 +198,30 @@ collect_ports_separate_installation() {
 
 # Setup common environment
 setup_panel_environment() {
-    # Download environment template
-    # For alpha branch, use dev branch's .env file
-    # For numeric versions, use main branch's .env file
-    local env_branch="$REMNAWAVE_BRANCH"
-    if [ "$REMNAWAVE_BRANCH" = "alpha" ]; then
-        env_branch="dev"
-    elif [[ "$REMNAWAVE_BRANCH" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
-        env_branch="main"
+    # Download the environment template from the ref matching the panel version
+    if ! curl -fsSL -o .env "$REMNAWAVE_ENV_SAMPLE_URL"; then
+        show_error "$(t config_env_download_failed) $REMNAWAVE_ENV_SAMPLE_URL"
+        return 1
     fi
-    curl -s -o .env "$REMNAWAVE_BACKEND_REPO/$env_branch/.env.sample"
+
+    if [ ! -s .env ]; then
+        show_error "$(t config_env_download_failed) $REMNAWAVE_ENV_SAMPLE_URL"
+        return 1
+    fi
+
+    # APP_SECRET is always written (the panel rejects the sample's `change_me` default);
+    # legacy JWT_* only when the downloaded template still declares them
+    local secrets=("APP_SECRET" "$APP_SECRET")
+    if grep -q '^JWT_AUTH_SECRET=' .env; then
+        secrets+=("JWT_AUTH_SECRET" "$JWT_AUTH_SECRET")
+    fi
+    if grep -q '^JWT_API_TOKENS_SECRET=' .env; then
+        secrets+=("JWT_API_TOKENS_SECRET" "$JWT_API_TOKENS_SECRET")
+    fi
 
     # Update environment file
     update_file ".env" \
-        "JWT_AUTH_SECRET" "$JWT_AUTH_SECRET" \
-        "JWT_API_TOKENS_SECRET" "$JWT_API_TOKENS_SECRET" \
+        "${secrets[@]}" \
         "IS_TELEGRAM_NOTIFICATIONS_ENABLED" "$IS_TELEGRAM_NOTIFICATIONS_ENABLED" \
         "TELEGRAM_BOT_TOKEN" "$TELEGRAM_BOT_TOKEN" \
         "TELEGRAM_NOTIFY_NODES" "$TELEGRAM_NOTIFY_NODES" \

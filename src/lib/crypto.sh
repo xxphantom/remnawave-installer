@@ -119,6 +119,8 @@ generate_custom_path() {
 
 # Generate common secrets
 generate_secrets() {
+    # 3.0.0 uses a single APP_SECRET; the JWT_* secrets remain for --panel-branch=2.x
+    APP_SECRET=$(openssl rand -hex 32 | tr -d '\n')
     JWT_AUTH_SECRET=$(openssl rand -hex 32 | tr -d '\n')
     JWT_API_TOKENS_SECRET=$(openssl rand -hex 32 | tr -d '\n')
     DB_USER="remnawave_$(openssl rand -hex 4 | tr -d '\n')"

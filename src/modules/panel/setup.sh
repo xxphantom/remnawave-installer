@@ -118,7 +118,9 @@ install_panel_only() {
 
     setup_panel_docker_compose
 
-    setup_panel_environment
+    if ! setup_panel_environment; then
+        return 1
+    fi
 
     create_makefile "$REMNAWAVE_DIR"
 

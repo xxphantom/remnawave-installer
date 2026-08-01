@@ -63,7 +63,8 @@ VERSION="2.2.0"
 if [[ "$REMNAWAVE_BRANCH" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
     # Use the version number as tag directly
     REMNAWAVE_BACKEND_TAG="$REMNAWAVE_BRANCH"
-    REMNAWAVE_NODE_TAG="$REMNAWAVE_BRANCH"
+    # Node is versioned independently — a panel version is not a valid node tag
+    REMNAWAVE_NODE_TAG="latest"
 elif [ "$REMNAWAVE_BRANCH" = "dev" ]; then
     REMNAWAVE_BACKEND_TAG="dev"
     REMNAWAVE_NODE_TAG="dev"
@@ -71,13 +72,23 @@ elif [ "$REMNAWAVE_BRANCH" = "alpha" ]; then
     REMNAWAVE_BACKEND_TAG="alpha"
     REMNAWAVE_NODE_TAG="dev"  # Node doesn't have alpha tag, use dev
 else
-    # Default to major version 2 for main branch (stable)
-    REMNAWAVE_BACKEND_TAG="2"
+    # Default to major version 3 for main branch (stable)
+    REMNAWAVE_BACKEND_TAG="3"
     REMNAWAVE_NODE_TAG="latest"
 fi
 
+# Git ref for .env.sample: numeric versions need the matching tag (main serves 3.x)
+if [[ "$REMNAWAVE_BRANCH" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+    REMNAWAVE_BACKEND_ENV_REF="refs/tags/$REMNAWAVE_BRANCH"
+elif [ "$REMNAWAVE_BRANCH" = "alpha" ]; then
+    REMNAWAVE_BACKEND_ENV_REF="refs/heads/dev"
+else
+    REMNAWAVE_BACKEND_ENV_REF="refs/heads/$REMNAWAVE_BRANCH"
+fi
+
 # GitHub repository URLs
-REMNAWAVE_BACKEND_REPO="https://raw.githubusercontent.com/remnawave/backend/refs/heads"
+REMNAWAVE_BACKEND_RAW="https://raw.githubusercontent.com/remnawave/backend"
+REMNAWAVE_ENV_SAMPLE_URL="$REMNAWAVE_BACKEND_RAW/$REMNAWAVE_BACKEND_ENV_REF/.env.sample"
 INSTALLER_REPO="https://raw.githubusercontent.com/xxphantom/remnawave-installer/refs/heads"
 
 # Main directories

@@ -177,12 +177,13 @@ delete_config_profile() {
     rm -f "$temp_file"
     
     # Check for successful deletion
+    # Panel 3.0.0 answers 204 with an empty body, 2.x answered {"response":{"isDeleted":true}}
     if [ -z "$delete_response" ] || echo "$delete_response" | jq -e '.response.isDeleted == true' >/dev/null 2>&1; then
         return 0
     fi
-    
+
     # Check if response indicates error
-    if echo "$delete_response" | jq -e '.error' >/dev/null 2>&1; then
+    if echo "$delete_response" | jq -e '.error // .errorCode // .message' >/dev/null 2>&1; then
         echo -e "${BOLD_RED}$(t api_failed_delete_profile)${NC}"
         echo
         echo "$(t api_response):"
@@ -454,11 +455,11 @@ EOF
         return 1
     fi
 
-    if echo "$user_response" | jq -e '.response.uuid' >/dev/null; then
+    # Panel 3.0.0 dropped the user uuid in favour of a numeric id and removed subscriptionUuid
+    if echo "$user_response" | jq -e '.response.id // .response.uuid' >/dev/null; then
         # Extract user data and save to global variables
-        USER_UUID=$(echo "$user_response" | jq -r '.response.uuid')
+        USER_ID=$(echo "$user_response" | jq -r '.response.id // .response.uuid')
         USER_SHORT_UUID=$(echo "$user_response" | jq -r '.response.shortUuid')
-        USER_SUBSCRIPTION_UUID=$(echo "$user_response" | jq -r '.response.subscriptionUuid')
         USER_VLESS_UUID=$(echo "$user_response" | jq -r '.response.vlessUuid')
         USER_TROJAN_PASSWORD=$(echo "$user_response" | jq -r '.response.trojanPassword')
         USER_SS_PASSWORD=$(echo "$user_response" | jq -r '.response.ssPassword')

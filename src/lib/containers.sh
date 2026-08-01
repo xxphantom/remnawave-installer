@@ -248,7 +248,9 @@ start_container() {
 
     mapfile -t services < <(docker compose -f "$compose_file" config --services)
 
-    local all_ok=true elapsed=0
+    # A crashing container is briefly "running" after each restart, so require two
+    # consecutive good polls
+    local all_ok=true elapsed=0 stable=0
     while [[ $elapsed -lt $max_wait ]]; do
         all_ok=true
         for svc in "${services[@]}"; do
@@ -259,12 +261,17 @@ start_container() {
                 break
             fi
         done
-        $all_ok && break
+        if $all_ok; then
+            stable=$((stable + 1))
+            [[ $stable -ge 2 ]] && break
+        else
+            stable=0
+        fi
         sleep $poll
         ((elapsed += poll))
     done
 
-    if $all_ok; then
+    if $all_ok && [[ $stable -ge 2 ]]; then
         printf "${BOLD_GREEN}$(t container_success_up)${NC}\n" \
             "$display_name" "$(
                 IFS=,
