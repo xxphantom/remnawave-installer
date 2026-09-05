@@ -43,6 +43,8 @@ EOF
 }
 
 https://{$PANEL_DOMAIN} {
+    encode zstd gzip
+
     @has_token_param {
         query caddy={$PANEL_SECRET_KEY}
     }
@@ -69,6 +71,8 @@ https://{$PANEL_DOMAIN} {
 }
 
 https://{$SUB_DOMAIN} {
+    encode zstd gzip
+
     handle {
         reverse_proxy {$SUB_BACKEND_URL} {
             header_up X-Real-IP {remote}

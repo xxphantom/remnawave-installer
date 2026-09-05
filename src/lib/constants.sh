@@ -56,30 +56,48 @@ YELLOW=$(tput setaf 3)
 NC=$(tput sgr0)
 
 # Script version
-VERSION="2.3.0"
+VERSION="2.4.0"
+
+# Default stable versions.
+# Node and subscription page use exact versions; Docker Hub has no major-only tags.
+PINNED_BACKEND_TAG="3.4.3"
+PINNED_NODE_TAG="3.4.1"
+PINNED_SUBPAGE_TAG="8.0.0"
+# Last releases compatible with panel 2.x
+LEGACY_NODE_TAG="2.8.0"
+LEGACY_SUBPAGE_TAG="7.2.6"
 
 # Docker image tags based on branch
 # Check if branch is a version number (e.g., 1.65, 2.0.1)
 if [[ "$REMNAWAVE_BRANCH" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
     # Use the version number as tag directly
     REMNAWAVE_BACKEND_TAG="$REMNAWAVE_BRANCH"
-    # Node is versioned independently — a panel version is not a valid node tag
-    REMNAWAVE_NODE_TAG="latest"
+    # Node and subscription page are versioned independently of the panel
+    if [[ "$REMNAWAVE_BRANCH" =~ ^2\. ]]; then
+        REMNAWAVE_NODE_TAG="$LEGACY_NODE_TAG"
+        REMNAWAVE_SUBPAGE_TAG="$LEGACY_SUBPAGE_TAG"
+    else
+        REMNAWAVE_NODE_TAG="$PINNED_NODE_TAG"
+        REMNAWAVE_SUBPAGE_TAG="$PINNED_SUBPAGE_TAG"
+    fi
 elif [ "$REMNAWAVE_BRANCH" = "dev" ]; then
     REMNAWAVE_BACKEND_TAG="dev"
     REMNAWAVE_NODE_TAG="dev"
+    REMNAWAVE_SUBPAGE_TAG="dev"
 elif [ "$REMNAWAVE_BRANCH" = "alpha" ]; then
     REMNAWAVE_BACKEND_TAG="alpha"
     REMNAWAVE_NODE_TAG="dev"  # Node doesn't have alpha tag, use dev
+    REMNAWAVE_SUBPAGE_TAG="dev"
 else
-    # Default to major version 3 for main branch (stable)
-    REMNAWAVE_BACKEND_TAG="3"
-    REMNAWAVE_NODE_TAG="latest"
+    # Stable versions for main
+    REMNAWAVE_BACKEND_TAG="$PINNED_BACKEND_TAG"
+    REMNAWAVE_NODE_TAG="$PINNED_NODE_TAG"
+    REMNAWAVE_SUBPAGE_TAG="$PINNED_SUBPAGE_TAG"
 fi
 
-# Git ref for .env.sample: numeric versions need the matching tag (main serves 3.x)
-if [[ "$REMNAWAVE_BRANCH" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
-    REMNAWAVE_BACKEND_ENV_REF="refs/tags/$REMNAWAVE_BRANCH"
+# Keep the environment template on the same release as the Docker image.
+if [[ "$REMNAWAVE_BACKEND_TAG" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+    REMNAWAVE_BACKEND_ENV_REF="refs/tags/$REMNAWAVE_BACKEND_TAG"
 elif [ "$REMNAWAVE_BRANCH" = "alpha" ]; then
     REMNAWAVE_BACKEND_ENV_REF="refs/heads/dev"
 else

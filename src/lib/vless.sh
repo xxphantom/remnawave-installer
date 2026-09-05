@@ -87,6 +87,7 @@ generate_xray_config() {
           "target": "$socket_path",
           "show": false,
           "xver": 1,
+          "minClientVer": "0.0.0",
           "shortIds": [
             "$short_id"
           ],

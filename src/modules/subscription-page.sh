@@ -11,7 +11,7 @@ setup_remnawave-subscription-page() {
     cat >docker-compose.yml <<EOF
 services:
     remnawave-subscription-page:
-        image: remnawave/subscription-page:latest
+        image: remnawave/subscription-page:$REMNAWAVE_SUBPAGE_TAG
         container_name: remnawave-subscription-page
         hostname: remnawave-subscription-page
         restart: always

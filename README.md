@@ -1,4 +1,4 @@
-[![Version](https://img.shields.io/badge/version-2.3.0-blue.svg)](https://github.com/xxphantom/remnawave-installer)
+[![Version](https://img.shields.io/badge/version-2.4.0-blue.svg)](https://github.com/xxphantom/remnawave-installer)
 [![Language](https://img.shields.io/badge/language-Bash-green.svg)]()
 [![OS Support](https://img.shields.io/badge/OS-Ubuntu-orange.svg)]()
 
@@ -48,10 +48,18 @@ sudo bash -c "$(curl -sL https://raw.githubusercontent.com/xxphantom/remnawave-i
 --keep-caddy-data         # Preserve certificates during reinstall
 ```
 
+The `main` mode installs [backend 3.4.3](https://github.com/remnawave/backend/releases/tag/3.4.3), [node 3.4.1](https://github.com/remnawave/node/releases/tag/3.4.1), and [subscription-page 8.0.0](https://github.com/remnawave/subscription-page/tree/8.0.0). The `.env` template comes from the same release as the panel image.
+
+The update menu uses the versions listed in the installer and keeps newer numeric tags. Download the current installer before updating your components.
+
+If you keep the panel on 2.x, node and subscription-page tags set to `latest` change to 2.8.0 and 7.2.6. Upgrading to 3.x also updates the node and subscription page on the same server. Before upgrading a separate node, the script asks you to confirm that its remote panel already runs 3.x.
+
+New REALITY configurations use `minClientVer: "0.0.0"` to allow mihomo, sing-box, and older Xray clients to connect. During a panel update, the script offers to add this setting to profiles without a minimum version. Existing version settings stay unchanged. [Xray warns](https://github.com/XTLS/Xray-core/blob/v26.7.28/infra/conf/transport_security.go) that removing this restriction increases the risk of the server IP being blocked by the GFW.
+
 **Examples:**
 ```bash
 # Use specific panel version
-sudo bash -c "$(curl -sL ...)" @ --lang=en --panel-branch=2.0.1
+sudo bash -c "$(curl -sL ...)" @ --lang=en --panel-branch=3.4.3
 
 # Dev version
 sudo bash -c "$(curl -sL ...)" @ --lang=en --panel-branch=dev

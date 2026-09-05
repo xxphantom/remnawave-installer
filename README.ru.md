@@ -1,4 +1,4 @@
-[![Версия](https://img.shields.io/badge/version-2.3.0-blue.svg)](https://github.com/xxphantom/remnawave-installer)
+[![Версия](https://img.shields.io/badge/version-2.4.0-blue.svg)](https://github.com/xxphantom/remnawave-installer)
 [![Язык](https://img.shields.io/badge/language-Bash-green.svg)]()
 [![ОС](https://img.shields.io/badge/OS-Ubuntu-orange.svg)]()
 
@@ -48,10 +48,18 @@ sudo bash -c "$(curl -sL https://raw.githubusercontent.com/xxphantom/remnawave-i
 --keep-caddy-data         # Сохранить сертификаты при переустановке
 ```
 
+В режиме `main` устанавливаются [backend 3.4.3](https://github.com/remnawave/backend/releases/tag/3.4.3), [node 3.4.1](https://github.com/remnawave/node/releases/tag/3.4.1) и [subscription-page 8.0.0](https://github.com/remnawave/subscription-page/tree/8.0.0). Шаблон `.env` берётся из того же релиза, что и образ панели.
+
+Меню обновления использует версии, указанные в установщике. Более новые версии с числовыми тегами сохраняются. Поэтому перед обновлением компонентов скачайте актуальный установщик.
+
+Если оставить панель на 2.x, теги `latest` у ноды и страницы подписки заменятся на 2.8.0 и 7.2.6. При переходе на 3.x обновятся панель, нода и страница подписки на этом сервере. Перед обновлением отдельной ноды скрипт попросит подтвердить, что удалённая панель уже работает на 3.x.
+
+В новых конфигурациях REALITY задано `minClientVer: "0.0.0"`, чтобы могли подключаться mihomo, sing-box и старые клиенты Xray. При обновлении панели скрипт предложит добавить этот параметр в профили, где минимальная версия не указана. Если версия уже задана, она сохранится. [Xray предупреждает](https://github.com/XTLS/Xray-core/blob/v26.7.28/infra/conf/transport_security.go), что снятие ограничения повышает риск блокировки IP со стороны GFW.
+
 **Примеры:**
 ```bash
 # Использовать конкретную версию панели
-sudo bash -c "$(curl -sL ...)" @ --lang=ru --panel-branch=2.0.1
+sudo bash -c "$(curl -sL ...)" @ --lang=ru --panel-branch=3.4.3
 
 # Dev версия
 sudo bash -c "$(curl -sL ...)" @ --lang=ru --panel-branch=dev

@@ -62,6 +62,7 @@ http://{$REMNAWAVE_PANEL_DOMAIN} {
 }
 
 https://{$REMNAWAVE_PANEL_DOMAIN} {
+    encode zstd gzip
 
     @login_path {
         path /{$REMNAWAVE_CUSTOM_LOGIN_ROUTE} /{$REMNAWAVE_CUSTOM_LOGIN_ROUTE}/ /{$REMNAWAVE_CUSTOM_LOGIN_ROUTE}/auth
@@ -105,6 +106,8 @@ http://{$CADDY_SUB_DOMAIN} {
 }
 
 https://{$CADDY_SUB_DOMAIN} {
+    encode zstd gzip
+
     handle {
         reverse_proxy http://127.0.0.1:3010 {
             header_up X-Real-IP {remote}
